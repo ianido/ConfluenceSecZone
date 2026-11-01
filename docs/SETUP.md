@@ -41,7 +41,7 @@ The harness runs the real resolver handlers and domain service in the Vite proce
 
 ## Provisioning your own Forge app (human steps)
 
-The repository contains a **placeholder** app id on purpose (never commit someone else's id or any token).
+`manifest.yml` carries the app id registered for this project (Aviva Credito Dev Developer Space). The id is an identifier, not a credential, but another developer deploying from this repository must run `forge register` in their own account, which replaces it. Never commit any token.
 
 1. `forge login` (Atlassian account email + API token created at https://id.atlassian.com/manage-profile/security/api-tokens; the token is entered interactively or via `FORGE_EMAIL`/`FORGE_API_TOKEN` environment variables, never in files).
 2. `forge register "Secure Sections (dev)"`: this rewrites `app.id` in `manifest.yml` in your working copy. Do not commit that change to the shared repository.

@@ -38,10 +38,12 @@ const allowed = new Set([
 for (const s of scopes)
   if (!allowed.has(s))
     problems.push(`unexpected scope ${s} (see docs/marketplace/SCOPES_RATIONALE.md)`);
-if (/00000000-0000-0000-0000-000000000000/.test(m.app?.id ?? '') === false) {
-  problems.push(
-    'app.id must stay the placeholder in the repository (run forge register in your own account)',
-  );
+if (
+  !/^ari:cloud:ecosystem::app\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+    m.app?.id ?? '',
+  )
+) {
+  problems.push('app.id must be a well-formed Forge app ARI (ari:cloud:ecosystem::app/<uuid>)');
 }
 if (problems.length) {
   console.error('Manifest policy FAILED:\n- ' + problems.join('\n- '));

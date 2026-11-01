@@ -1,5 +1,6 @@
-# Placeholder app id. Run `forge register` in YOUR Atlassian developer account: it replaces this value.
-# Never commit a real app id/secret for another developer's app. See docs/SETUP.md.
+# App id registered for the Aviva Credito Dev Developer Space (an identifier, not a credential).
+# To deploy your own copy run `forge register` in YOUR Atlassian developer account: it replaces this value.
+# Never commit tokens or secrets. See docs/SETUP.md.
 app:
   id: ari:cloud:ecosystem::app/0fed04f8-10e4-4bcb-a8a0-e6513aac33f6
   runtime:

@@ -16,4 +16,4 @@ Start with [docs/SETUP.md](docs/SETUP.md). Architecture: [docs/ARCHITECTURE.md](
 verification matrix: [docs/SECURITY.md](docs/SECURITY.md). Platform facts and open spikes:
 [docs/PLATFORM_FINDINGS.md](docs/PLATFORM_FINDINGS.md). QA checklist: [docs/QA_MATRIX.md](docs/QA_MATRIX.md).
 
-The repository intentionally contains a placeholder Forge app id and no credentials.
+The repository contains the registered Forge app id of the Aviva Credito Dev app (an identifier, not a credential) and no tokens. Run `forge register` in your own account to deploy your own copy.
