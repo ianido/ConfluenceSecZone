@@ -1,0 +1,62 @@
+# Placeholder app id. Run `forge register` in YOUR Atlassian developer account: it replaces this value.
+# Never commit a real app id/secret for another developer's app. See docs/SETUP.md.
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs24.x
+  storage:
+    classifications:
+      - ugc
+      - pii
+    entities:
+      - name: ssdoc
+        attributes:
+          rev:
+            type: integer
+          p:
+            type: string
+          r:
+            type: string
+          payload:
+            type: any
+        indexes:
+          - name: by-partition
+            partition:
+              - p
+            range:
+              - r
+
+modules:
+  macro:
+    - key: secure-section-macro
+      title: Secure Section
+      description: Confidential rich-text content with its own permissions, independent of page permissions.
+      category: structure
+      resource: macro-ui
+      resolver:
+        function: resolver
+      adfExport:
+        function: adf-export
+  scheduledTrigger:
+    - key: maintenance-daily
+      function: maintenance
+      interval: day
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: adf-export
+      handler: index.adfExport
+    - key: maintenance
+      handler: index.maintenance
+
+resources:
+  - key: macro-ui
+    path: static/macro-ui/dist
+
+permissions:
+  scopes:
+    - storage:app
+    - read:confluence-content.permission
+    - read:confluence-user
+    - read:confluence-groups
+    - read:content-details:confluence
