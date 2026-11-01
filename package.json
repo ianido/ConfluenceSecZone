@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build:shared": "npm run build -w @secure-sections/shared",
-    "build:ui": "npm run build -w @secure-sections/macro-ui",
+    "build:ui": "npm run build -w @secure-sections/macro-ui && node scripts/bundle-guard.mjs",
     "build": "npm run build:shared && npm run typecheck:backend && npm run build:ui",
     "typecheck:backend": "tsc -p tsconfig.json --noEmit",
     "typecheck": "npm run build:shared && npm run typecheck:backend && npm run typecheck -w @secure-sections/shared && npm run typecheck -w @secure-sections/macro-ui",
@@ -24,7 +24,8 @@
     "test:coverage": "npm run build:shared && vitest run --coverage",
     "forge:lint": "forge lint",
     "audit:deps": "npm audit --audit-level=high",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "validate:manifest": "node scripts/validate-manifest.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run validate:manifest"
   },
   "dependencies": {
     "@forge/api": "^8.4.0",
@@ -41,6 +42,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^16.0.0",
     "prettier": "^3.6.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"

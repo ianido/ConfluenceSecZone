@@ -47,6 +47,7 @@ const en = {
   'editor.conflict.body':
     'A newer version exists. Review the latest version, then re-apply your changes. Your draft is kept in this window only until you close it.',
   'editor.conflict.loadLatest': 'Load latest version',
+  'editor.conflict.overwrite': 'Keep my draft and replace the latest version (it stays in History)',
   'editor.invalid': 'This content contains elements that are not allowed.',
   'editor.tooLarge': 'This content is too large to save.',
   'toolbar.bold': 'Bold',
@@ -188,6 +189,8 @@ const es: Record<MessageKey, string> = {
   'editor.conflict.body':
     'Existe una versión más reciente. Revisa la última versión y vuelve a aplicar tus cambios. Tu borrador solo se conserva en esta ventana hasta que la cierres.',
   'editor.conflict.loadLatest': 'Cargar la última versión',
+  'editor.conflict.overwrite':
+    'Conservar mi borrador y reemplazar la última versión (queda en el Historial)',
   'editor.invalid': 'Este contenido incluye elementos que no están permitidos.',
   'editor.tooLarge': 'Este contenido es demasiado grande para guardarlo.',
   'toolbar.bold': 'Negrita',

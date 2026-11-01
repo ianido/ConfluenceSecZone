@@ -132,11 +132,9 @@ export class ForgeConfluenceGateway implements ConfluenceGateway {
       const chunk = accountIds.slice(i, i + 100);
       const qs = new URLSearchParams();
       for (const id of chunk) qs.append('accountId', id);
-      const res = await api
-        .asApp()
-        .requestConfluence(route`/wiki/rest/api/user/bulk?${qs}`, {
-          headers: { Accept: 'application/json' },
-        });
+      const res = await api.asApp().requestConfluence(route`/wiki/rest/api/user/bulk?${qs}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (!res.ok) fail(res);
       const j = await readJson(res);
       for (const r of Array.isArray(j.results) ? j.results : []) {
