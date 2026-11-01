@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      forge:
+        patterns: ['@forge/*']
+      tiptap-prosemirror:
+        patterns: ['@tiptap/*', 'prosemirror-*']
+      tooling:
+        patterns:
+          [
+            'eslint*',
+            '@eslint/*',
+            'typescript*',
+            'prettier',
+            'vitest',
+            '@vitest/*',
+            '@playwright/*',
+          ]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
