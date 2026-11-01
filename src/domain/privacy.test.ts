@@ -62,3 +62,24 @@ describe('privacy: closed accounts', () => {
     expect(snapshot()).toBe(before);
   });
 });
+
+describe('privacy: reporting cycle', () => {
+  it('does not re-report accounts within the 7-day cycle and resumes afterwards', async () => {
+    const w = await world();
+    const first = await w.privacy.sweep();
+    expect(first.skipped).toBeUndefined();
+    expect(w.privacyGateway.calls).toBe(1);
+
+    const second = await w.privacy.sweep();
+    expect(second.skipped).toBe(true);
+    expect(w.privacyGateway.calls).toBe(1);
+
+    w.clock.advanceDays(6);
+    expect((await w.privacy.sweep()).skipped).toBe(true);
+
+    w.clock.advanceDays(2);
+    const third = await w.privacy.sweep();
+    expect(third.skipped).toBeUndefined();
+    expect(w.privacyGateway.calls).toBe(2);
+  });
+});

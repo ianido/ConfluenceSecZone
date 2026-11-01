@@ -131,7 +131,9 @@ export class FakeConfluence implements ConfluenceGateway {
 export class FakePrivacy implements PrivacyGateway {
   closed = new Set<string>();
   reported: string[] = [];
+  calls = 0;
   async report(accounts: Array<{ accountId: string; updatedAt: string }>) {
+    this.calls += 1;
     this.reported.push(...accounts.map((a) => a.accountId));
     return accounts
       .filter((a) => this.closed.has(a.accountId))

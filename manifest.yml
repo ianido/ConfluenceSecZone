@@ -56,6 +56,7 @@ resources:
 permissions:
   scopes:
     - storage:app
+    - report:personal-data
     - read:confluence-content.permission
     - read:confluence-user
     - read:confluence-groups

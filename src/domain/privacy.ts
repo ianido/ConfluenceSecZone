@@ -14,10 +14,23 @@ import {
 
 const ERASED = 'erased';
 
+/**
+ * Atlassian's default personal-data reporting cycle is 7 days and apps must not report an
+ * accountId more often (https://developer.atlassian.com/platform/forge/user-privacy-guidelines/).
+ * The helper API does not expose the Cycle-Period header, so the default is used as a floor.
+ */
+export const REPORT_CYCLE_MS = 7 * 86_400_000;
+
+interface PrivacyCursor {
+  cursor: string | null;
+  nextAllowedAt?: string;
+}
+
 export interface PrivacyResult {
   accountsReported: number;
   accountsErased: number;
   done: boolean;
+  skipped?: boolean;
 }
 
 /**
@@ -57,10 +70,14 @@ export class PrivacyService {
   }
 
   async sweep(maxSections = 20): Promise<PrivacyResult> {
-    const cursorDoc = await this.store.get<MetaDoc<{ cursor: string | null }>>(
+    const cursorDoc = await this.store.get<MetaDoc<PrivacyCursor>>(
       'meta',
       Keys.meta('privacy-cursor'),
     );
+    const nextAllowedAt = cursorDoc?.value.value.nextAllowedAt;
+    if (nextAllowedAt && Date.parse(nextAllowedAt) > this.clock.now().getTime()) {
+      return { accountsReported: 0, accountsErased: 0, done: true, skipped: true };
+    }
     const page = await this.store.list<SectionDoc>({
       entity: 'section',
       partition: 'all',
@@ -84,9 +101,15 @@ export class PrivacyService {
         id,
         page.items.map((i) => i.value.sectionId),
       );
-    const next: MetaDoc<{ cursor: string | null }> = {
+    const passComplete = page.nextCursor === null;
+    const next: MetaDoc<PrivacyCursor> = {
       schema: SCHEMA_VERSION,
-      value: { cursor: page.nextCursor },
+      value: {
+        cursor: page.nextCursor,
+        ...(passComplete
+          ? { nextAllowedAt: new Date(this.clock.now().getTime() + REPORT_CYCLE_MS).toISOString() }
+          : {}),
+      },
       updatedAt: this.clock.now().toISOString(),
     };
     await this.store.transact([
