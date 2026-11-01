@@ -1,7 +1,7 @@
 # Placeholder app id. Run `forge register` in YOUR Atlassian developer account: it replaces this value.
 # Never commit a real app id/secret for another developer's app. See docs/SETUP.md.
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/0fed04f8-10e4-4bcb-a8a0-e6513aac33f6
   runtime:
     name: nodejs24.x
   storage:
