@@ -1,9 +1,9 @@
 import { maxRole, type Role } from '@secure-sections/shared';
-import { GatewayError, type ConfluenceGateway, type PagePermissions } from '../ports/confluence.js';
-import type { Doc, Store } from '../ports/store.js';
-import type { TrustedContext } from './context.js';
-import { DomainError } from './errors.js';
-import { Keys, type BindingDoc, type SectionDoc } from './model.js';
+import { GatewayError, type ConfluenceGateway, type PagePermissions } from '../ports/confluence';
+import type { Doc, Store } from '../ports/store';
+import type { TrustedContext } from './context';
+import { DomainError } from './errors';
+import { Keys, type BindingDoc, type SectionDoc } from './model';
 
 export interface RoleResolution {
   role: Role | null;

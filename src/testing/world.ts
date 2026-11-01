@@ -1,11 +1,11 @@
-import type { TrustedContext } from '../domain/context.js';
-import { RetentionService } from '../domain/retention.js';
-import { PrivacyService } from '../domain/privacy.js';
-import { SecureSectionService } from '../domain/service.js';
-import { createHandlers } from '../resolvers.js';
-import type { Clock, Logger } from '../ports/runtime.js';
-import { FakeConfluence, FakePrivacy } from './fake-gateway.js';
-import { MemoryStore } from './memory-store.js';
+import type { TrustedContext } from '../domain/context';
+import { RetentionService } from '../domain/retention';
+import { PrivacyService } from '../domain/privacy';
+import { SecureSectionService } from '../domain/service';
+import { createHandlers } from '../resolvers';
+import type { Clock, Logger } from '../ports/runtime';
+import { FakeConfluence, FakePrivacy } from './fake-gateway';
+import { MemoryStore } from './memory-store';
 
 export class FakeClock implements Clock {
   constructor(private t = Date.parse('2026-01-01T00:00:00.000Z')) {}

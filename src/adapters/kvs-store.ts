@@ -8,7 +8,7 @@ import {
   type ListResult,
   type Store,
   type TxOp,
-} from '../ports/store.js';
+} from '../ports/store';
 
 export const ENTITY = 'ssdoc';
 export const INDEX = 'by-partition';

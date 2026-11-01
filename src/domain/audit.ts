@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AuditAction } from '@secure-sections/shared';
-import { GENESIS_HASH, SCHEMA_VERSION, type AuditDoc, type AuditMeta } from './model.js';
+import { GENESIS_HASH, SCHEMA_VERSION, type AuditDoc, type AuditMeta } from './model';
 
 function canonical(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);

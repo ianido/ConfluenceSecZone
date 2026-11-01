@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ctxFor, makeWorld, rawContext, type World } from '../testing/world.js';
+import { ctxFor, makeWorld, rawContext, type World } from '../testing/world';
 
 const doc = (t: string) => ({
   type: 'doc',
@@ -194,7 +194,7 @@ describe('content versions', () => {
       .dump('revision')
       .find((r) => (r.value as { version: number }).version === 2)!;
     const evil = JSON.stringify({ type: 'doc', content: [{ type: 'script' }] });
-    const { sha256 } = await import('./audit.js');
+    const { sha256 } = await import('./audit');
     w.store.tamper('revision', rev.key, (v) => ({
       ...(v as object),
       bodyJson: evil,

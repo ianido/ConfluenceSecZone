@@ -8,7 +8,7 @@ import {
   type ListResult,
   type Store,
   type TxOp,
-} from '../ports/store.js';
+} from '../ports/store';
 
 interface Row {
   entity: EntityName;

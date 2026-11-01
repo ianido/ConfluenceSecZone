@@ -8,8 +8,8 @@ import {
   type PagePermissions,
   type PrivacyGateway,
   type UserInfo,
-} from '../ports/confluence.js';
-import { PAGE_ID_RE } from '../domain/model.js';
+} from '../ports/confluence';
+import { PAGE_ID_RE } from '../domain/model';
 
 const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json' };
 const MEMBERSHIP_PAGE = 100;

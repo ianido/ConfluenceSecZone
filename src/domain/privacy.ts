@@ -1,7 +1,7 @@
-import type { Clock, Logger } from '../ports/runtime.js';
-import type { PrivacyGateway } from '../ports/confluence.js';
-import { StoreConflictError, type Store, type TxOp } from '../ports/store.js';
-import { sha256 } from './audit.js';
+import type { Clock, Logger } from '../ports/runtime';
+import type { PrivacyGateway } from '../ports/confluence';
+import { StoreConflictError, type Store, type TxOp } from '../ports/store';
+import { sha256 } from './audit';
 import {
   Idx,
   Keys,
@@ -10,7 +10,7 @@ import {
   type MetaDoc,
   type RevisionDoc,
   type SectionDoc,
-} from './model.js';
+} from './model';
 
 const ERASED = 'erased';
 

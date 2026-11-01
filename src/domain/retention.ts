@@ -1,6 +1,6 @@
 import type { RetentionConfig } from '@secure-sections/shared';
-import type { Clock, Logger } from '../ports/runtime.js';
-import { MAX_TX_OPS, type Doc, type Store, type TxOp } from '../ports/store.js';
+import type { Clock, Logger } from '../ports/runtime';
+import { MAX_TX_OPS, type Doc, type Store, type TxOp } from '../ports/store';
 import {
   Idx,
   Keys,
@@ -10,7 +10,7 @@ import {
   type MetaDoc,
   type RevisionDoc,
   type SectionDoc,
-} from './model.js';
+} from './model';
 
 export interface SweepResult {
   sectionsScanned: number;

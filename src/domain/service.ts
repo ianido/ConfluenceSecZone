@@ -23,19 +23,19 @@ import {
   isPrincipalType,
   isRole,
 } from '@secure-sections/shared';
-import { GatewayError, type ConfluenceGateway } from '../ports/confluence.js';
-import type { Clock, IdGenerator, Logger } from '../ports/runtime.js';
+import { GatewayError, type ConfluenceGateway } from '../ports/confluence';
+import type { Clock, IdGenerator, Logger } from '../ports/runtime';
 import {
   StoreConflictError,
   StoreUnavailableError,
   type Doc,
   type Store,
   type TxOp,
-} from '../ports/store.js';
-import { buildChainedAudit, buildUnchainedAudit, sha256, verifyChain } from './audit.js';
-import { AuthorizationService, type BoundResolved, type Resolved } from './authz.js';
-import type { TrustedContext } from './context.js';
-import { DomainError } from './errors.js';
+} from '../ports/store';
+import { buildChainedAudit, buildUnchainedAudit, sha256, verifyChain } from './audit';
+import { AuthorizationService, type BoundResolved, type Resolved } from './authz';
+import type { TrustedContext } from './context';
+import { DomainError } from './errors';
 import {
   ACCOUNT_ID_RE,
   DEFAULT_RETENTION,
@@ -52,7 +52,7 @@ import {
   type MetaDoc,
   type RevisionDoc,
   type SectionDoc,
-} from './model.js';
+} from './model';
 
 export class CorruptedContentError extends Error {
   constructor() {

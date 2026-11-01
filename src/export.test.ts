@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exportPlaceholderAdf } from './export.js';
+import { exportPlaceholderAdf } from './export';
 
 describe('adfExport', () => {
   it('returns a static placeholder with no dynamic input', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_DOC } from '@secure-sections/shared';
-import { ctxFor, makeWorld, type World } from '../testing/world.js';
+import { ctxFor, makeWorld, type World } from '../testing/world';
 
 const A = 'aaaaaaaa-0000-4000-8000-00000000000a';
 const B = 'bbbbbbbb-0000-4000-8000-00000000000b';
@@ -124,7 +124,7 @@ describe('section lifecycle and binding', () => {
     await w.service.saveContent(ctxFor('alice'), doc('SECRET-ALPHA'), 1);
     const mallory = ctxFor('mallory');
     const res = await w.handlers.saveContent({
-      context: { ...(await import('../testing/world.js')).rawContext(mallory) },
+      context: { ...(await import('../testing/world')).rawContext(mallory) },
       payload: {
         doc: doc('pwned'),
         baseVersion: 1,

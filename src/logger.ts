@@ -1,4 +1,4 @@
-import type { Logger } from './ports/runtime.js';
+import type { Logger } from './ports/runtime';
 
 /** Content-free structured logging. Callers must only pass identifiers/counters, never content. */
 export const consoleLogger: Logger = {

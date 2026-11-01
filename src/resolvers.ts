@@ -6,12 +6,12 @@ import {
   type ResponseOf,
   type SectionView,
 } from '@secure-sections/shared';
-import { parseResolverContext, type TrustedContext } from './domain/context.js';
-import { DomainError } from './domain/errors.js';
-import { CorruptedContentError, type SecureSectionService } from './domain/service.js';
-import { GatewayError } from './ports/confluence.js';
-import type { Logger } from './ports/runtime.js';
-import { StoreConflictError, StoreUnavailableError } from './ports/store.js';
+import { parseResolverContext, type TrustedContext } from './domain/context';
+import { DomainError } from './domain/errors';
+import { CorruptedContentError, type SecureSectionService } from './domain/service';
+import { GatewayError } from './ports/confluence';
+import type { Logger } from './ports/runtime';
+import { StoreConflictError, StoreUnavailableError } from './ports/store';
 
 export interface ResolverRequest {
   payload?: unknown;

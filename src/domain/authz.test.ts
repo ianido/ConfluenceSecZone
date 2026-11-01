@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Role } from '@secure-sections/shared';
-import { ctxFor, makeWorld, type World } from '../testing/world.js';
+import { ctxFor, makeWorld, type World } from '../testing/world';
 
 const doc = (t: string) => ({
   type: 'doc',
@@ -166,7 +166,7 @@ describe('authorization: failure handling is fail-closed', () => {
     const v = await w.service.getSection(ctxFor('alice')).catch((e) => ({ state: e.code }));
     expect(JSON.stringify(v)).not.toContain('TOP-SECRET');
     const r = await w.handlers.getSection({
-      context: (await import('../testing/world.js')).rawContext(ctxFor('alice')),
+      context: (await import('../testing/world')).rawContext(ctxFor('alice')),
     });
     expect(r).toEqual({ state: 'UNAVAILABLE' });
   });
@@ -176,7 +176,7 @@ describe('authorization: failure handling is fail-closed', () => {
     await grant(w, 'GROUP', 'g-hr', 'VIEW');
     w.gateway.failing.add('groupMembership');
     const r = await w.handlers.getSection({
-      context: (await import('../testing/world.js')).rawContext(ctxFor('groupie')),
+      context: (await import('../testing/world')).rawContext(ctxFor('groupie')),
     });
     expect(r).toEqual({ state: 'UNAVAILABLE' });
     const direct = await w.service.getSection(ctxFor('alice'));
@@ -188,7 +188,7 @@ describe('authorization: failure handling is fail-closed', () => {
     await grant(w, 'GROUP', 'g-hr', 'VIEW');
     w.gateway.incompleteGroupFor.add('outsider');
     const r = await w.handlers.getSection({
-      context: (await import('../testing/world.js')).rawContext(ctxFor('outsider')),
+      context: (await import('../testing/world')).rawContext(ctxFor('outsider')),
     });
     expect(r).toEqual({ state: 'UNAVAILABLE' });
   });
@@ -204,14 +204,14 @@ describe('authorization: failure handling is fail-closed', () => {
     const w = await world();
     w.store.failReads = true;
     const r = await w.handlers.getSection({
-      context: (await import('../testing/world.js')).rawContext(ctxFor('alice')),
+      context: (await import('../testing/world')).rawContext(ctxFor('alice')),
     });
     expect(r).toEqual({ state: 'UNAVAILABLE' });
   });
 
   it('anonymous / missing identity in context is rejected before any lookup', async () => {
     const w = await world();
-    const raw = (await import('../testing/world.js')).rawContext(ctxFor('alice'));
+    const raw = (await import('../testing/world')).rawContext(ctxFor('alice'));
     delete (raw as Record<string, unknown>).accountId;
     w.gateway.calls.length = 0;
     expect(await w.handlers.getSection({ context: raw })).toEqual({ state: 'UNAVAILABLE' });

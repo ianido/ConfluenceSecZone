@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ctxFor, makeWorld } from '../testing/world.js';
+import { ctxFor, makeWorld } from '../testing/world';
 
 const alice = ctxFor('alice');
 

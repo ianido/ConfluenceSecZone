@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { ForgeConfluenceGateway, ForgePrivacyGateway } from './adapters/forge-gateway.js';
-import { KvsStore } from './adapters/kvs-store.js';
-import { PrivacyService } from './domain/privacy.js';
-import { RetentionService } from './domain/retention.js';
-import { SecureSectionService } from './domain/service.js';
-import { consoleLogger } from './logger.js';
-import { systemClock } from './ports/runtime.js';
-import { createHandlers, type Handlers } from './resolvers.js';
+import { ForgeConfluenceGateway, ForgePrivacyGateway } from './adapters/forge-gateway';
+import { KvsStore } from './adapters/kvs-store';
+import { PrivacyService } from './domain/privacy';
+import { RetentionService } from './domain/retention';
+import { SecureSectionService } from './domain/service';
+import { consoleLogger } from './logger';
+import { systemClock } from './ports/runtime';
+import { createHandlers, type Handlers } from './resolvers';
 
 export interface App {
   service: SecureSectionService;

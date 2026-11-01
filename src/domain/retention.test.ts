@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RETENTION } from './model.js';
-import { ctxFor, makeWorld } from '../testing/world.js';
+import { DEFAULT_RETENTION } from './model';
+import { ctxFor, makeWorld } from '../testing/world';
 
 const doc = (t: string) => ({
   type: 'doc',

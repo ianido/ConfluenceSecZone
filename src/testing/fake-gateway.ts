@@ -7,7 +7,7 @@ import {
   type PagePermissions,
   type PrivacyGateway,
   type UserInfo,
-} from '../ports/confluence.js';
+} from '../ports/confluence';
 
 /**
  * Scriptable Confluence double for offline contract/security tests. It models the *documented*

@@ -1,9 +1,9 @@
 import Resolver from '@forge/resolver';
 import { RESOLVER_FUNCTIONS } from '@secure-sections/shared';
-import { getApp } from './composition.js';
-import { exportPlaceholderAdf } from './export.js';
-import { DEFAULT_RETENTION } from './domain/model.js';
-import { consoleLogger } from './logger.js';
+import { getApp } from './composition';
+import { exportPlaceholderAdf } from './export';
+import { DEFAULT_RETENTION } from './domain/model';
+import { consoleLogger } from './logger';
 
 const resolver = new Resolver();
 for (const name of RESOLVER_FUNCTIONS) {

@@ -1,4 +1,4 @@
-import { ACCOUNT_ID_RE, LOCAL_ID_RE, PAGE_ID_RE } from './model.js';
+import { ACCOUNT_ID_RE, LOCAL_ID_RE, PAGE_ID_RE } from './model';
 
 /**
  * The ONLY source of user, tenant, page and macro identity for authorization.

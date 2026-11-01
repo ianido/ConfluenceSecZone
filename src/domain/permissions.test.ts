@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ctxFor, makeWorld, type World } from '../testing/world.js';
-import { StoreConflictError } from '../ports/store.js';
+import { ctxFor, makeWorld, type World } from '../testing/world';
+import { StoreConflictError } from '../ports/store';
 
 async function world(): Promise<World> {
   const w = makeWorld();

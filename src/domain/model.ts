@@ -1,5 +1,5 @@
 import type { AuditAction, PrincipalType, RetentionConfig, Role } from '@secure-sections/shared';
-import type { DocKeyIndex } from '../ports/store.js';
+import type { DocKeyIndex } from '../ports/store';
 
 export const SCHEMA_VERSION = 1;
 export const GENESIS_HASH = '0'.repeat(64);
