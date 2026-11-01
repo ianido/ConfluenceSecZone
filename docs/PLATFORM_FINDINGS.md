@@ -1,0 +1,126 @@
+# Platform findings
+
+Source of truth: official Atlassian documentation. Every fact below was read from the cited page
+(fetched 2026-11-01). Anything not confirmed by a page is listed under **Unverified assumptions** and
+under **Spikes**. Community-forum statements are marked `(community)` and are treated as weaker evidence.
+
+Legend: **V** = verified in official docs, **C** = community/staff post, **U** = unverified, needs a spike on a real site.
+
+## 1. Runtime and manifest
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 1.1 | `app.runtime.name: nodejs24.x` is supported and recommended; `nodejs22.x` and `nodejs20.x` also exist. Node 20 reached end of life on 2026-04-30. | V | https://developer.atlassian.com/platform/forge/manifest-reference/ , https://developer.atlassian.com/platform/forge/function-reference/nodejs-runtime/ |
+| 1.2 | Each invocation gets 512 MB by default (128 to 1024 MB configurable). | V | same |
+| 1.3 | Function module `key` max 23 chars, regex `^[a-zA-Z0-9_-]+$`; `handler` is `file.function`. | V | https://developer.atlassian.com/platform/forge/manifest-reference/modules/function/ |
+| 1.4 | The macro module supports `resource` (Custom UI), `resolver`, and `adfExport`. | V | https://developer.atlassian.com/platform/forge/manifest-reference/modules/macro/ |
+| 1.5 | Custom UI is rendered in a sandboxed iframe. Plain HTML links are not clickable; `router.navigate` from `@forge/bridge` must be used. | V | macro module page |
+| 1.6 | `app.licensing.enabled: true` enables licensing; `context.license` only exists for paid apps in production (undefined for free apps, unlisted apps, development and staging). | V | https://developer.atlassian.com/platform/marketplace/listing-forge-apps/ , https://developer.atlassian.com/platform/forge/runtime-reference/app-context-api/ |
+
+## 2. Context and identity (the foundation of the security model)
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 2.1 | "Context parameters in each resolver function are guaranteed to be secure, unalterable, and valid to be used for authorization." | V | https://developer.atlassian.com/platform/forge/app-context-security/ |
+| 2.2 | Context from the bridge `view.getContext()` "is able to be modified in the browser and is not guaranteed to be secure"; it must not be used for authorization. | V | same |
+| 2.3 | The macro extension context contains `content.id`, `content.type`, `space.key`/`space.id`, `isEditing`, `config`. | V | macro module page |
+| 2.4 | The resolver context carries `localId` (macro instance) and `accountId`/`cloudId`/`moduleKey`/`environmentId`. | V/U | resolver `context` as used by app-context docs; field names for Custom UI resolver `extension.content.id` are from the macro page. Exact runtime shape is spike S2. |
+| 2.5 | **`localId` is NOT unique.** When a macro is copied within a page or to another page the context `localId` is copied too. A second, different `local-id` exists on the ADF node but is not exposed to Forge. | C (Atlassian staff reply in thread) | https://community.developer.atlassian.com/t/how-can-i-distinguish-between-macro-instances/72192 , https://community.developer.atlassian.com/t/how-to-identify-macros-in-forge/50559 |
+| 2.6 | Therefore `localId` alone can never prove authority over a section. This product keys bindings by (`cloudId`, `pageId`, `localId`) and treats an unbound pair as "unconfigured", see ADR-0002. | design decision based on 2.5 | |
+
+Consequences: client-supplied `localId`/`pageId`/section ids are never trusted; the server reads them only
+from `req.context`.
+
+## 3. Confluence APIs used
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 3.1 | `POST /wiki/rest/api/content/{id}/permission/check` with `{subject:{type:user|group,identifier}, operation:read|update|delete}` returns `{hasPermission, errors[]}`. It evaluates site, space and content restriction permissions. | V | https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content-permissions/ |
+| 3.2 | Required permission: "Can use" when checking yourself; **Confluence Administrator** when checking another subject. | V | same |
+| 3.3 | Scope: classic `read:confluence-content.permission`; granular `read:content.permission:confluence`. Data security policy: "Not exempt from app access rules". | V | same |
+| 3.4 | Possible error strings include "User does not have permission to the content", "Anonymous users are not allowed to use Confluence". | V | same |
+| 3.5 | Content restriction endpoints need permission to view the content and `read:confluence-content.all` / `read:content-details:confluence`. | V | https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content-restrictions/ |
+
+Design use: the gateway calls `permission/check` **as the invoking user checking themselves** (`asUser`,
+no admin permission needed) for `read` and `update`. Group membership and directory lookups use `asApp`
+only for data that is not secret (names, memberships) and only **after** the user's own page access was
+confirmed (Atlassian Enterprise Certified requirement 1.14: validate user permission before `asApp`,
+https://developer.atlassian.com/platform/marketplace/atlassian-enterprise-certified-program/).
+
+## 4. Storage
+
+### 4.1 Custom Entity Store (KVS) with transactions (chosen)
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 4.1.1 | `kvs.transact()` executes multiple set/delete/check operations atomically: "all operations are either committed if all conditions are met or rolled back together". | V | https://developer.atlassian.com/platform/forge/storage-reference/entities-transactions/ |
+| 4.1.2 | Limits per transaction: 25 operations, each key once, 4 MB payload; counts as one write; may fail with `TOO_MANY_REQUESTS`. | V | same, https://developer.atlassian.com/platform/forge/limits-kvs-ce/ |
+| 4.1.3 | Conditions use `Filter`/`FilterConditions` on entity attributes (`check`, and conditions on `set`/`delete`). | V | transactions page |
+| 4.1.4 | Value size 240 KiB, object depth 31, key length 500, key regex `/^(?!\s+$)[a-zA-Z0-9:._\s-#]+$/`. | V | limits page |
+| 4.1.5 | Entities: max 20 per app, 7 custom indexes and 50 attributes per entity, names 3 to 60 chars. | V | limits page |
+| 4.1.6 | KVS is installation-scoped: "Forge automatically prepends an identifier to every key"; data from one site/product/environment cannot be read from another. | V | limits page, https://developer.atlassian.com/platform/forge/storage-reference/sql/ (partitioning section) |
+| 4.1.7 | Default write conflict strategy is last-write-wins; `keyPolicy: FAIL_IF_EXISTS` exists on `set`. | V | https://developer.atlassian.com/platform/forge/runtime-reference/storage-api-custom-entities/ |
+| 4.1.8 | Rate: 1000 RPS per install; 4000 reads and 4000 writes per minute counted in 10 KB units; 1 MB/s write per key. | V | limits page |
+| 4.1.9 | Expired TTL data may linger up to 48 h. (We do not rely on TTL for security.) | V | custom entities page |
+| 4.1.10 | `storage:app` scope is required. Entities are declared in `app.storage.entities`. | V | custom entities page |
+| 4.1.11 | **Whether a `check`/condition with `notExists` on a missing key behaves as our adapter expects (create-if-absent) and whether concurrent racing creates are serialised.** | U | Spike S4/S5 |
+
+### 4.2 Forge SQL (rejected, ADR-0001)
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 4.2.1 | "Transactions are not yet supported"; each statement may contain only one query; foreign keys unsupported, no cascades. | V | https://developer.atlassian.com/platform/forge/storage-reference/sql/ , https://developer.atlassian.com/platform/forge/storage-reference/sql-migration-guide/ , staff reply https://community.developer.atlassian.com/t/forge-sql-atomic-transaction/95047 |
+| 4.2.2 | Limits: 1 GiB per production install, 200 tables, 150 DML RPS, 6 MiB row, 1 MiB request, 4 MiB response. | V | https://developer.atlassian.com/platform/forge/limits-sql/ |
+
+Because the ACL/binding/audit invariants (final administrator, binding uniqueness, hash-chained audit)
+need multi-record atomic conditional writes, KVS transactions fit and SQL (no transactions) does not.
+
+## 5. Privacy API
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 5.1 | Apps storing personal data must report `accountId`s with `privacy.reportPersonalData` (max 90 per request) and erase/refresh accounts returned as `closed`/`updated`. | V | https://developer.atlassian.com/platform/forge/runtime-reference/privacy-api/ , https://developer.atlassian.com/platform/forge/user-privacy-guidelines/ |
+| 5.2 | Requires scope `report:personal-data`. (This was **missing from the first manifest** and was added after verification.) | V | https://developer.atlassian.com/platform/forge/manifest-reference/scopes-forge/ |
+| 5.3 | Default reporting cycle is 7 days and apps must not report an account more often; the real value may come from a `Cycle-Period` response header. The helper does not surface the header, so the code enforces the 7-day floor. | V | user privacy guide |
+
+## 6. Export, copies and other leak surfaces
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 6.1 | The macro module has an `adfExport` function hook that returns ADF used for exports. Our implementation returns a static placeholder panel and never reads storage. | V (hook exists) / U (which export paths call it: PDF, Word, email, notifications, search) | macro module page; spike S8 |
+| 6.2 | Macro `config` is stored in the page body (ADF `parameters`). We never store secrets in config. | V (config is page data) | macro module page |
+| 6.3 | Macro parameters can declare `indexing`. We declare no parameters, so nothing is indexed. | V | macro module page |
+| 6.4 | Whether page search/AI/Rovo indexes see rendered Custom UI output: unknown; Custom UI runs in an iframe and its content is not part of page storage. | U | spike S8 |
+
+## 7. Marketplace and licensing
+
+| # | Fact | Status | Source |
+|---|------|--------|--------|
+| 7.1 | Listing review criteria: function, security, performance (large datasets), support (EULA, docs, support contact), branding. | V | https://developer.atlassian.com/platform/marketplace/creating-a-marketplace-listing/ |
+| 7.2 | A public privacy policy is required for Marketplace partners. | V | https://www.atlassian.com/trust/marketplace |
+| 7.3 | "Runs on Atlassian" requires Atlassian-hosted compute and storage, matching data residency, and no data egress except analytics. | V | https://developer.atlassian.com/platform/forge/runs-on-atlassian/ |
+| 7.4 | Two billing models exist: standard (all users) and user-based billing (early access programme at the time of writing). One model per app. | V | https://developer.atlassian.com/platform/forge/licensing-overview/ |
+| 7.5 | Licence check: `context.license?.active === true` in resolvers; `GET /forge/app/v1/license` exists. | V | listing page, https://developer.atlassian.com/platform/forge/apis-reference/license-api/ |
+| 7.6 | Enterprise Certified requirements relevant to this app: no EOL Node runtime (1.11), explicit egress list (1.12), CI vulnerability scanning (1.13), `asUser` by default and permission validation before `asApp` (1.14), no High/Critical dependency vulnerabilities (1.16). Cloud Fortified is being phased out. | V | https://developer.atlassian.com/platform/marketplace/atlassian-enterprise-certified-program/ |
+
+## 8. Platform limits and cost
+
+Forge moved to consumption-based pricing on 2026-01-01; most hard quotas were retired but platform limits
+(above) remain and "strictly abusive or unstable usage" may be throttled.
+Source: https://developer.atlassian.com/platform/forge/platform-quotas-and-limits/ . See docs/OPERATIONS.md for the
+estimated footprint. Exact prices were not captured here and must be taken from the Developer Console cost estimator.
+
+## 9. Unverified assumptions (each has a spike)
+
+| Spike | Question | Why it matters | Status |
+|-------|----------|----------------|--------|
+| S1 | Is the context `localId` stable across draft, publish, edit, page version restore, move, and what is it for a macro in an unpublished draft? | Binding survives normal editing, otherwise users lose access to their content (fail-safe: shown as unconfigured, content kept). | NOT EXECUTED (no Forge site) |
+| S2 | Exact resolver context shape: `extension.content.id` for page, draft, blogpost, template; `accountId` present for anonymous? | `parseResolverContext` fails closed if absent. | NOT EXECUTED |
+| S3 | Does `permission/check` accept draft content ids and return correct `update` rights while a page is being created? | Creating a section on a brand-new draft. | NOT EXECUTED |
+| S4 | KVS `transact` conditions: `notExists` on missing key; failure surface for a violated condition (error code/class). | `KvsStore` maps 429/5xx to Unavailable and other 4xx to Conflict. | NOT EXECUTED |
+| S5 | Two concurrent transactions creating the same key: exactly one wins. | Idempotent bind/create and final-administrator rule. | NOT EXECUTED |
+| S6 | Tiptap 3 + Custom UI iframe CSP/sandbox: clipboard, IME, table editing, keyboard focus, theme. | Editor usability. UI-level checks pass in headless Chromium without the Forge sandbox. | PARTIAL (Chromium harness only) |
+| S7 | Do the used endpoints work with the declared scopes (`/user/current` with operations for site admin, `/user/memberof`, `/group/{id}/membersByGroupId`, `/user/bulk`)? | Group inheritance, diagnostics, recovery. `forge lint` and a site run decide. | NOT EXECUTED |
+| S8 | Exports (PDF, Word, email, notification digests, search, page history, Rovo) never contain the content; `adfExport` is invoked. | Confidentiality outside the app. | NOT EXECUTED |
+
+Spike run instructions are in docs/QA_MATRIX.md (section "Real-site spikes").

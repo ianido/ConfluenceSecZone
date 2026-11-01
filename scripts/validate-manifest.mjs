@@ -10,3 +10,41 @@ if (!result.success) {
 }
 for (const w of result.warnings ?? []) console.warn(`warning: ${w.message}`);
 console.log('Manifest validation passed (offline schema validators).');
+
+// Product policy checks (repository-specific, on top of the schema): Forge-only, minimal surface.
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
+
+const m = parse(readFileSync(new URL('../manifest.yml', import.meta.url), 'utf8'));
+const problems = [];
+if (m.app?.runtime?.name !== 'nodejs24.x') problems.push('runtime must be nodejs24.x');
+if (m.remotes) problems.push('remotes (Forge Remote) are not allowed');
+if (m.permissions?.external) problems.push('external egress permissions are not allowed');
+if (m.connectModules || m.app?.connect) problems.push('Connect modules are not allowed');
+if (m.permissions?.content) problems.push('CSP/content permissions must not be loosened');
+for (const mac of m.modules?.macro ?? []) {
+  if (mac.config || mac.parameters)
+    problems.push(`macro ${mac.key} must not declare config/parameters`);
+}
+const scopes = new Set(m.permissions?.scopes ?? []);
+const allowed = new Set([
+  'storage:app',
+  'report:personal-data',
+  'read:confluence-content.permission',
+  'read:confluence-user',
+  'read:confluence-groups',
+  'read:content-details:confluence',
+]);
+for (const s of scopes)
+  if (!allowed.has(s))
+    problems.push(`unexpected scope ${s} (see docs/marketplace/SCOPES_RATIONALE.md)`);
+if (/00000000-0000-0000-0000-000000000000/.test(m.app?.id ?? '') === false) {
+  problems.push(
+    'app.id must stay the placeholder in the repository (run forge register in your own account)',
+  );
+}
+if (problems.length) {
+  console.error('Manifest policy FAILED:\n- ' + problems.join('\n- '));
+  process.exit(1);
+}
+console.log('Manifest policy checks passed.');
