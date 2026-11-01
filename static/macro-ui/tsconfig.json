@@ -11,7 +11,7 @@
     "src/**/*.tsx",
     "vite.config.ts",
     "vitest.config.ts",
-    "e2e/**/*.ts",
-    "playwright.config.ts"
+    "harness/**/*.tsx",
+    "vite.harness.config.ts"
   ]
 }
