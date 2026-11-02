@@ -36,7 +36,19 @@ updates:
             '@playwright/*',
           ]
         update-types: [minor, patch]
+      # Catch-all for the remaining direct dependencies; major bumps stay as individual PRs.
+      npm-other:
+        patterns: ['*']
+        update-types: [minor, patch]
+      # One PR for all security fixes, including transitive dependencies.
+      npm-security:
+        applies-to: security-updates
+        patterns: ['*']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+        update-types: [minor, patch]
