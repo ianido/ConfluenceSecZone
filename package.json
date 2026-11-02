@@ -1,0 +1,57 @@
+{
+  "name": "secure-sections-for-confluence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Forge-hosted Confluence Cloud macro for independently permissioned confidential rich-text sections.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "static/macro-ui"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @secure-sections/shared",
+    "build:ui": "npm run build -w @secure-sections/macro-ui && node scripts/bundle-guard.mjs",
+    "build": "npm run build:shared && npm run typecheck:backend && npm run build:ui",
+    "typecheck:backend": "tsc -p tsconfig.json --noEmit && tsc -p e2e/tsconfig.json --noEmit",
+    "typecheck": "npm run build:shared && npm run typecheck:backend && npm run typecheck -w @secure-sections/shared && npm run typecheck -w @secure-sections/macro-ui",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "npm run build:shared && vitest run",
+    "test:coverage": "npm run build:shared && vitest run --coverage",
+    "forge:lint": "forge lint",
+    "audit:deps": "npm audit --omit=dev --audit-level=high",
+    "test:e2e": "playwright test",
+    "validate:manifest": "node scripts/validate-manifest.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run validate:manifest"
+  },
+  "dependencies": {
+    "@forge/api": "^8.4.0",
+    "@forge/kvs": "^2.1.1",
+    "@forge/resolver": "^2.0.2",
+    "@secure-sections/shared": "*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@forge/cli": "^15.0.0",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^16.0.0",
+    "prettier": "^3.6.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5",
+    "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "prosemirror-view": "^1.42.9"
+  }
+}

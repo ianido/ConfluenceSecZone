@@ -1,0 +1,299 @@
+:root {
+  color-scheme: light dark;
+  --ss-text: var(--ds-text, #172b4d);
+  --ss-muted: var(--ds-text-subtlest, #626f86);
+  --ss-bg: var(--ds-surface, #ffffff);
+  --ss-bg-raised: var(--ds-surface-raised, #f7f8f9);
+  --ss-border: var(--ds-border, #dcdfe4);
+  --ss-accent: var(--ds-background-brand-bold, #0c66e4);
+  --ss-accent-text: var(--ds-text-inverse, #ffffff);
+  --ss-danger: var(--ds-text-danger, #ae2e24);
+  --ss-ok: var(--ds-text-success, #216e4e);
+  --ss-warn-bg: var(--ds-background-warning, #fff7d6);
+  --ss-focus: var(--ds-border-focused, #388bff);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-mode='light']) {
+    --ss-text: var(--ds-text, #dee4ea);
+    --ss-muted: var(--ds-text-subtlest, #8c9bab);
+    --ss-bg: var(--ds-surface, #1d2125);
+    --ss-bg-raised: var(--ds-surface-raised, #22272b);
+    --ss-border: var(--ds-border, #3c444c);
+    --ss-accent: var(--ds-background-brand-bold, #579dff);
+    --ss-accent-text: var(--ds-text-inverse, #1d2125);
+    --ss-danger: var(--ds-text-danger, #f87168);
+    --ss-ok: var(--ds-text-success, #7ee2b8);
+    --ss-warn-bg: var(--ds-background-warning, #3d3000);
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 8px;
+  font:
+    14px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: var(--ss-text);
+  background: transparent;
+}
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+}
+h3 {
+  font-size: 1rem;
+  margin: 16px 0 8px;
+}
+.ss-muted {
+  color: var(--ss-muted);
+}
+.ss-ok {
+  color: var(--ss-ok);
+}
+.ss-err {
+  color: var(--ss-danger);
+}
+.ss-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ss-card,
+.ss-panel,
+.ss-callout {
+  border: 1px solid var(--ss-border);
+  border-radius: 6px;
+  background: var(--ss-bg-raised);
+  padding: 12px 16px;
+  margin: 8px 0;
+}
+.ss-warn {
+  background: var(--ss-warn-bg);
+}
+.ss-shell {
+  border: 1px solid var(--ss-border);
+  border-radius: 6px;
+  background: var(--ss-bg);
+}
+.ss-shell > [role='tabpanel'] {
+  padding: 12px 16px;
+}
+.ss-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--ss-border);
+  padding: 4px 8px 0;
+}
+.ss-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 8px 12px;
+  color: var(--ss-muted);
+  cursor: pointer;
+  font: inherit;
+}
+.ss-tab[aria-selected='true'] {
+  color: var(--ss-text);
+  border-bottom-color: var(--ss-accent);
+  font-weight: 600;
+}
+.ss-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[contenteditable]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--ss-focus);
+  outline-offset: 2px;
+}
+.ss-btn,
+.ss-tool {
+  appearance: none;
+  border: 1px solid var(--ss-border);
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+  min-height: 32px;
+}
+.ss-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ss-primary {
+  background: var(--ss-accent);
+  color: var(--ss-accent-text);
+  border-color: transparent;
+}
+.ss-danger {
+  color: var(--ss-danger);
+  border-color: var(--ss-danger);
+}
+.ss-actions,
+.ss-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.ss-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--ss-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--ss-bg-raised);
+}
+.ss-tool {
+  min-width: 32px;
+  padding: 4px 8px;
+}
+.ss-tool[aria-pressed='true'] {
+  background: var(--ss-accent);
+  color: var(--ss-accent-text);
+}
+.ss-link-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  align-items: end;
+}
+.ss-editor {
+  min-height: 160px;
+  padding: 8px 12px;
+  border: 1px solid var(--ss-border);
+  border-radius: 0 0 6px 6px;
+  background: var(--ss-bg);
+  outline: none;
+}
+.ss-prose p,
+.ss-editor p {
+  margin: 0 0 8px;
+}
+.ss-prose blockquote,
+.ss-editor blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--ss-border);
+  color: var(--ss-muted);
+}
+.ss-prose pre,
+.ss-editor pre {
+  overflow: auto;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--ss-bg-raised);
+}
+.ss-prose code,
+.ss-editor code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--ss-bg-raised);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.ss-prose pre code,
+.ss-editor pre code {
+  padding: 0;
+  background: none;
+}
+.ss-table-wrap {
+  overflow-x: auto;
+}
+.ss-prose table,
+.ss-editor table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  min-width: 50%;
+}
+.ss-prose th,
+.ss-prose td,
+.ss-editor th,
+.ss-editor td {
+  border: 1px solid var(--ss-border);
+  padding: 4px 8px;
+  vertical-align: top;
+}
+.ss-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ss-grid th,
+.ss-grid td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ss-border);
+}
+.ss-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--ss-border);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--ss-muted);
+}
+.ss-chip-warn {
+  color: var(--ss-danger);
+  border-color: var(--ss-danger);
+}
+.ss-history,
+.ss-audit,
+.ss-hits {
+  padding-left: 20px;
+}
+.ss-history li,
+.ss-hits li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+label {
+  display: grid;
+  gap: 4px;
+}
+input,
+select {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  min-height: 32px;
+}
+@media (max-width: 480px) {
+  .ss-shell > [role='tabpanel'] {
+    padding: 8px;
+  }
+  .ss-tab {
+    padding: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

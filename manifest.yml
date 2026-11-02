@@ -1,0 +1,64 @@
+# App id registered for the Aviva Credito Dev Developer Space (an identifier, not a credential).
+# To deploy your own copy run `forge register` in YOUR Atlassian developer account: it replaces this value.
+# Never commit tokens or secrets. See docs/SETUP.md.
+app:
+  id: ari:cloud:ecosystem::app/0fed04f8-10e4-4bcb-a8a0-e6513aac33f6
+  runtime:
+    name: nodejs24.x
+  storage:
+    classifications:
+      - ugc
+      - pii
+    entities:
+      - name: ssdoc
+        attributes:
+          rev:
+            type: integer
+          p:
+            type: string
+          r:
+            type: string
+          payload:
+            type: any
+        indexes:
+          - name: by-partition
+            partition:
+              - p
+            range:
+              - r
+
+modules:
+  macro:
+    - key: secure-section-macro
+      title: Secure Section
+      description: Confidential rich-text content with its own permissions, independent of page permissions.
+      category: structure
+      resource: macro-ui
+      resolver:
+        function: resolver
+      adfExport:
+        function: adf-export
+  scheduledTrigger:
+    - key: maintenance-daily
+      function: maintenance
+      interval: day
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: adf-export
+      handler: index.adfExport
+    - key: maintenance
+      handler: index.maintenance
+
+resources:
+  - key: macro-ui
+    path: static/macro-ui/dist
+
+permissions:
+  scopes:
+    - storage:app
+    - report:personal-data
+    - read:confluence-content.permission
+    - read:confluence-user
+    - read:confluence-groups
+    - read:content-details:confluence
