@@ -12,9 +12,9 @@ applied once by an admin (steps at the end).
 | 2   | At least 1 approval, from a code owner                               | The maintainer approves every contribution                                                    | `protect-main.json` + `.github/CODEOWNERS`                     |
 | 3   | New pushes dismiss approvals; last pusher cannot self-approve        | An approved PR cannot be changed afterwards unnoticed                                         | `protect-main.json`                                            |
 | 4   | All review conversations resolved before merge                       | Feedback is not lost                                                                          | `protect-main.json`                                            |
-| 5   | Required status checks, branch up to date with `main`                | Nothing broken or untested lands: `verify`, `ui-e2e`, `secrets-scan`, `codeql`, `branch-name` | `protect-main.json`, `.github/workflows/`                      |
-| 6   | No force pushes, no branch deletion on `main` and `dev`              | History cannot be rewritten or removed                                                        | `protect-main.json`                                            |
-| 7   | Linear history, squash merge only                                    | One reviewed commit per change, easy revert                                                   | `protect-main.json`                                            |
+| 5   | Required status checks, branch up to date with `main`                | Nothing broken or untested lands: `verify`, `ui-e2e`, `secrets-scan`, `codeql`, `branch-name` | `protect-main-integrity.json`, `.github/workflows/`            |
+| 6   | No force pushes, no branch deletion on `main` and `dev`              | History cannot be rewritten or removed                                                        | `protect-main-integrity.json`                                  |
+| 7   | Linear history, squash merge only                                    | One reviewed commit per change, easy revert                                                   | `protect-main.json` + `protect-main-integrity.json`            |
 | 8   | Signed commits                                                       | Authorship is verifiable                                                                      | Existing `default-rules` ruleset                               |
 | 9   | Release tags `v*` cannot be created, moved or deleted by others      | Published versions stay immutable                                                             | `.github/rulesets/protect-release-tags.json`                   |
 | 10  | Branch naming standard (regex)                                       | Traceable work, consistent history                                                            | `branch-name.yml` check (+ optional `branch-naming.json`)      |
@@ -34,18 +34,21 @@ integration branch if releases need staging (the rules already cover `dev`).
 
 ## Owner bypass
 
-A single maintainer cannot approve their own pull request. `protect-main.json` therefore lets the **repository admin role bypass
-only through a pull request** (`bypass_mode: pull_request`): the owner still opens a PR, waits for checks, and merges
-it, but is not blocked by the "1 approval" rule. Contributors have no bypass. If you add another maintainer, remove
-the bypass entry so every PR needs a second person.
+A single maintainer cannot approve their own pull request. `protect-main.json` therefore lets the **repository admin
+role bypass only through a pull request** (`bypass_mode: pull_request`): the owner still opens a PR and merges it, but
+is not blocked by the "1 approval" rule. A bypass applies to every rule of the ruleset it is listed in, so the
+rulesets are split on purpose: `protect-main.json` holds only the review rules (bypassable), while
+`protect-main-integrity.json` holds required status checks, no force push, no deletion and linear history, with
+**no bypass**. The owner can skip the approval, but never a failing or missing CI check. Contributors have no bypass.
+If you add another maintainer, remove the bypass entry so every PR needs a second person.
 
 ## Branch naming
 
 The standard is the regular expression in [CONTRIBUTING.md](../CONTRIBUTING.md#branch-names). GitHub's native
 "restrict branch names" rule with a regex is only available on GitHub Enterprise Cloud organizations, so on a personal
-public repository it is enforced by the `branch-name` workflow (a required status check on pull requests; the same
+public repository it is enforced by the `branch-name` workflow (a required status check on pull requests, run with `pull_request_target` so the version on `main` is the one that executes and a PR cannot edit or replace it; the same
 workflow also fails pushes to wrongly named branches, which a ruleset could not block). If you ever move to an
-Enterprise organization, import `.github/rulesets/branch-naming.json` to block such branches at push time.
+Enterprise organization, import `.github/rulesets/branch-naming.json` to block such branches at push time (it excludes `dependabot/**`).
 
 Known consequences:
 
@@ -71,8 +74,8 @@ settings; it prints OK or FAIL per step and can be re-run. The manual UI steps b
 
 Rulesets and repository settings are not applied by merging this PR. Do this once:
 
-1. **Rulesets**: Settings, Rules, Rulesets, New ruleset, Import a ruleset. Import `protect-main.json` and
-   `protect-release-tags.json`. Merge the pull request that adds the `branch-name` workflow first, otherwise the
+1. **Rulesets**: Settings, Rules, Rulesets, New ruleset, Import a ruleset. Import `protect-main.json`,
+   `protect-main-integrity.json` and `protect-release-tags.json`. Merge the pull request that adds the `branch-name` workflow first, otherwise the
    required `branch-name` check does not exist yet (the first run of a workflow makes its check selectable).
 2. **Code security** (Settings, Code security): enable Private vulnerability reporting, Dependency graph,
    Dependabot alerts and security updates, Secret scanning and Push protection, and code scanning (CodeQL is already

@@ -30,17 +30,19 @@ apply_ruleset() {
 }
 
 apply_ruleset "$DIR/protect-main.json"
+apply_ruleset "$DIR/protect-main-integrity.json"
 apply_ruleset "$DIR/protect-release-tags.json"
 
 run "merge settings: squash only" api -X PATCH "repos/$REPO" \
   -F allow_squash_merge=true -F allow_merge_commit=false -F allow_rebase_merge=false -F allow_auto_merge=false
 
-run "secret scanning + push protection + dependabot security updates" api -X PATCH "repos/$REPO" \
+run "secret scanning + push protection" api -X PATCH "repos/$REPO" \
   --input - <<'JSON'
-{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"},"dependabot_security_updates":{"status":"enabled"}}}
+{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}
 JSON
 
 run "dependabot alerts" api -X PUT "repos/$REPO/vulnerability-alerts"
+run "dependabot security updates (automated security fixes)" api -X PUT "repos/$REPO/automated-security-fixes"
 run "private vulnerability reporting" api -X PUT "repos/$REPO/private-vulnerability-reporting"
 run "workflow token read-only, no PR approval by Actions" api -X PUT "repos/$REPO/actions/permissions/workflow" \
   -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
