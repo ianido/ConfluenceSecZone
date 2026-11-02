@@ -1,0 +1,12 @@
+# Every change needs a review from the owner (enforced by the "protect-main" ruleset).
+*                       @ianido
+
+# Security-sensitive and supply-chain files: explicit on purpose.
+/.github/               @ianido
+/manifest.yml           @ianido
+/package.json           @ianido
+/package-lock.json      @ianido
+/scripts/               @ianido
+/src/domain/            @ianido
+/src/adapters/          @ianido
+/SECURITY.md            @ianido

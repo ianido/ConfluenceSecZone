@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a change before writing code
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security, privacy and permission impact
+      description: New scopes, storage, exports or egress need an explicit justification.
