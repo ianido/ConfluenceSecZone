@@ -5,7 +5,7 @@
   "conditions": {
     "ref_name": {
       "include": ["~ALL"],
-      "exclude": []
+      "exclude": ["refs/heads/dependabot/**"]
     }
   },
   "bypass_actors": [],
