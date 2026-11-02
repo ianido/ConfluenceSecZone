@@ -24,11 +24,11 @@ jobs:
           BRANCH: ${{ github.event_name == 'pull_request_target' && github.head_ref || github.ref_name }}
         run: |
           node -e '
-            const re = new RegExp(String.raw`^(main|dev|((feat|fix|hotfix|refactor)\/[0-9]+-[a-zA-Z0-9][a-zA-Z0-9._-]*)|(release|chore|docs|test|ci|build)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)\n?$`);
+            const re = new RegExp(String.raw`^(main|dev|((feat|fix|hotfix|refactor)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)|(release|chore|docs|test|ci|build)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)\n?$`);
             const name = process.env.BRANCH ?? "";
             if (!re.test(name)) {
               console.error("Invalid branch name: " + name);
-              console.error("Allowed: main | dev | (feat|fix|hotfix|refactor)/<issue-number>-<description> | (release|chore|docs|test|ci|build)/<description>");
+              console.error("Allowed: main | dev | (feat|fix|hotfix|refactor)/<description> | (release|chore|docs|test|ci|build)/<description>");
               console.error("See CONTRIBUTING.md#branch-names");
               process.exit(1);
             }
