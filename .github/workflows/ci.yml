@@ -80,10 +80,10 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
 
 # Forge lint and deploy need Atlassian credentials and are deliberately NOT run here.
 # See docs/DEPLOYMENT.md for the manual, human-approved procedure.
