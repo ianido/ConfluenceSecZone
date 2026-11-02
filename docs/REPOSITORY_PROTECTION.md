@@ -61,7 +61,13 @@ unsigned commits are rejected on push; a merge commit or rebase merge of unsigne
 auto-deleted while the deletion rule covers all branches. If that is too strict, restrict `default-rules` to
 `main` and `dev` or remove the deletion rule.
 
-## Applying the settings (GitHub UI, admin)
+## Applying the settings
+
+Fastest: as a repository admin run `gh auth login` and then `scripts/apply-repo-protection.sh` (add `--dry-run` to preview).
+It imports both rulesets and sets merge, secret scanning, Dependabot, private vulnerability reporting and Actions
+settings; it prints OK or FAIL per step and can be re-run. The manual UI steps below are the equivalent.
+
+### Manual steps (GitHub UI, admin)
 
 Rulesets and repository settings are not applied by merging this PR. Do this once:
 
