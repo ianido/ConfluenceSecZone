@@ -5,30 +5,28 @@ on:
   # replace this check. It never checks out or runs PR code; it only reads the branch name.
   pull_request_target:
     types: [opened, reopened, synchronize, edited]
-  push:
-    branches: ['**']
 
 permissions: {}
 
 jobs:
   branch-name:
     # Dependabot cannot choose its branch names (dependabot/<ecosystem>/...), so its PRs are exempt.
-    # Judge the PR author, not the actor: a maintainer editing a Dependabot PR must not trip the check.
-    if: ${{ (github.event_name == 'pull_request_target' && github.event.pull_request.user.login || github.actor) != 'dependabot[bot]' }}
+    # Judge the PR author, not the actor: a maintainer editing or rebasing a Dependabot PR must not trip the check.
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       # No checkout on purpose: this job must never touch untrusted PR code (pull_request_target has a write-capable token context).
       - name: Validate branch name
         env:
-          BRANCH: ${{ github.event_name == 'pull_request_target' && github.head_ref || github.ref_name }}
+          BRANCH: ${{ github.head_ref }}
         run: |
           node -e '
-            const re = new RegExp(String.raw`^(main|dev|((feat|fix|hotfix|refactor)\/[0-9]+-[a-zA-Z0-9][a-zA-Z0-9._-]*)|(release|chore|docs|test|ci|build)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)\n?$`);
+            const re = new RegExp(String.raw`^(main|dev|((feat|fix|hotfix|refactor)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)|(release|chore|docs|test|ci|build)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)\n?$`);
             const name = process.env.BRANCH ?? "";
             if (!re.test(name)) {
               console.error("Invalid branch name: " + name);
-              console.error("Allowed: main | dev | (feat|fix|hotfix|refactor)/<issue-number>-<description> | (release|chore|docs|test|ci|build)/<description>");
+              console.error("Allowed: main | dev | (feat|fix|hotfix|refactor)/<description> | (release|chore|docs|test|ci|build)/<description>");
               console.error("See CONTRIBUTING.md#branch-names");
               process.exit(1);
             }

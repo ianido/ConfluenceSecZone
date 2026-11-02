@@ -15,7 +15,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else {
     console.error(
       `Invalid branch name: "${name}"\n` +
-        'Allowed: main | dev | (feat|fix|hotfix|refactor)/<issue-number>-<description> | (release|chore|docs|test|ci|build)/<description>\n' +
+        'Allowed: main | dev | (feat|fix|hotfix|refactor)/<description> | (release|chore|docs|test|ci|build)/<description>\n' +
         `Pattern: ${BRANCH_NAME_PATTERN}`,
     );
     process.exit(1);

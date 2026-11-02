@@ -6,8 +6,11 @@ import { BRANCH_NAME_PATTERN, BRANCH_NAME_REGEX } from '../scripts/branch-name-p
 const valid = [
   'main',
   'dev',
+  'feat/add-audit-export',
   'feat/12-add-audit-export',
+  'fix/null-check',
   'fix/7-null-check',
+  'fix/abc-123',
   'hotfix/301-leak.in-export',
   'refactor/9-split_service',
   'release/1.2.0',
@@ -20,10 +23,7 @@ const valid = [
 
 const invalid = [
   'master',
-  'feat/add-audit-export',
-  'feat/12-',
   'feat/-12-x',
-  'fix/abc-123',
   'feature/12-x',
   'Feat/12-x',
   'chore/',

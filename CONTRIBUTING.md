@@ -8,8 +8,8 @@ reviews and approves. Nobody, including the maintainer, pushes directly to `main
 1. **Open an issue first** for anything beyond a typo. Use the bug or feature template. Security problems go through
    the private form in [SECURITY.md](SECURITY.md), never a public issue.
 2. **Fork** the repository (external contributors) or create a branch (collaborators).
-3. **Create a branch** that follows the naming standard below. The issue number is part of the name for `feat`, `fix`,
-   `hotfix` and `refactor`.
+3. **Create a branch** that follows the naming standard below. Issue numbers are optional in `feat`, `fix`, `hotfix`
+   and `refactor` branch names.
 4. **Set up and verify** locally (Node 24, npm 10+):
 
    ```bash
@@ -32,18 +32,19 @@ Allowed names (enforced by the `branch-name` CI check, which is a required check
 | Pattern                                                       | Use                          | Example                    |
 | ------------------------------------------------------------- | ---------------------------- | -------------------------- |
 | `main`, `dev`                                                 | Long-lived branches          |                            |
-| `feat/<issue>-<description>`                                  | New behaviour                | `feat/12-audit-export`     |
-| `fix/<issue>-<description>`                                   | Bug fix                      | `fix/7-null-check`         |
-| `hotfix/<issue>-<description>`                                | Urgent production fix        | `hotfix/301-export-leak`   |
-| `refactor/<issue>-<description>`                              | No behaviour change          | `refactor/9-split-service` |
+| `feat/<description>`                                          | New behaviour                | `feat/add-audit-export`    |
+| `fix/<description>`                                           | Bug fix                      | `fix/null-check`           |
+| `hotfix/<description>`                                        | Urgent production fix        | `hotfix/export-leak`       |
+| `refactor/<description>`                                      | No behaviour change          | `refactor/split-service`   |
 | `release/<description>`                                       | Release preparation          | `release/1.2.0`            |
 | `chore/`, `docs/`, `test/`, `ci/`, `build/` + `<description>` | Maintenance, no issue needed | `docs/readme-contributing` |
 
-`<issue>` is the number of the GitHub issue. `<description>` starts with a letter or digit and then uses letters,
-digits, `.`, `_` or `-`. The exact regular expression lives in `scripts/branch-name-pattern.mjs`:
+Issue numbers may optionally prefix the description in `feat`, `fix`, `hotfix` and `refactor` names (for example,
+`feat/12-audit-export`). `<description>` starts with a letter or digit and then uses letters, digits, `.`, `_` or `-`.
+The exact regular expression lives in `scripts/branch-name-pattern.mjs`:
 
 ```
-^(main|dev|((feat|fix|hotfix|refactor)\/[0-9]+-[a-zA-Z0-9][a-zA-Z0-9._-]*)|(release|chore|docs|test|ci|build)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)\n?$
+^(main|dev|((feat|fix|hotfix|refactor)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)|(release|chore|docs|test|ci|build)\/[a-zA-Z0-9][a-zA-Z0-9._-]*)\n?$
 ```
 
 Dependabot branches are exempt because Dependabot cannot rename them.
