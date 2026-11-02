@@ -22,8 +22,8 @@
 
 ### Release blockers (see docs/BLOCKERS.md)
 
-- [ ] (HUMAN) Provision dev site, run spikes S1-S8 and QA matrix B/C
-- [ ] (HUMAN) `forge login` + `forge lint` + `forge deploy -e development`
+- [x] (HUMAN) Provision dev site; `forge login` + `forge lint` + `forge deploy -e development` + install (2026-11-01)
+- [ ] (HUMAN) Run spikes S1-S7, the rest of S8 and QA matrix C, recording results (export and site search reported OK on 2026-11-01)
 - [ ] (HUMAN) Legal review of privacy policy and EULA; choose licensing model
 - [ ] (HUMAN) Independent security review (PROMPT AUDIT)
 

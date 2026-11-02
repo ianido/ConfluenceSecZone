@@ -24,7 +24,7 @@ What each script does:
 | `npm test`                  | builds shared, runs Vitest projects `backend` (domain, resolvers, security matrix, shared) and `macro-ui` (jsdom, axe) |
 | `npm run build`             | shared + UI production build + bundle guard (no eval, storage APIs, external URLs, duplicate ProseMirror)              |
 | `npm run validate:manifest` | Forge manifest schema (`@forge/manifest`) and repository policy checks. Not a replacement for `forge lint`             |
-| `npm run forge:lint`        | `forge lint`: **requires `forge login`** (see BLOCKERS B-001)                                                          |
+| `npm run forge:lint`        | `forge lint`: requires `forge login` (passed on 2026-11-01)                                                            |
 
 ## Local development without Confluence
 

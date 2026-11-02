@@ -6,7 +6,7 @@ Date: 2026-11-01 (UTC). Branch: `cursor/secure-sections-forge-build-18af`. Playb
 
 The product is complete enough to deploy to a **dedicated Forge development site** and be tested by humans. It is **NOT**
 a Marketplace candidate and **must not be described as production ready**: several security properties are verified only
-against test doubles and the first contact with real Forge/Confluence has not happened (B-001 to B-004).
+against test doubles and real-site verification is still mostly pending (B-002 to B-004). Update 2026-11-01: `forge lint` passed, the app was deployed and installed on a development environment, and export and site search were reported OK by the maintainer.
 
 ## What was built
 
@@ -18,18 +18,18 @@ against test doubles and the first contact with real Forge/Confluence has not ha
 
 ## Evidence (executed)
 
-| Check                                                                                           | Result                                               |
-| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `npm run lint` (ESLint + Prettier)                                                              | PASS                                                 |
-| `npm run typecheck` (backend, shared, UI, e2e)                                                  | PASS                                                 |
-| Vitest backend project                                                                          | 210 tests PASS (10 files)                            |
-| Vitest macro-ui project (jsdom, axe)                                                            | 21 tests PASS (3 files)                              |
-| Playwright (Chromium, real handlers, in-memory store, axe incl. contrast)                       | 6 tests PASS                                         |
-| `npm run build` (shared, UI, bundle guard: no eval/storage/external URLs/duplicate ProseMirror) | PASS                                                 |
-| `npm run validate:manifest` (schema + policy)                                                   | PASS                                                 |
-| `npm run audit:deps` (production, high)                                                         | PASS; 6 moderate advisories remain                   |
-| `forge lint`                                                                                    | **NOT EXECUTED** (no `forge login`, B-001)           |
-| Forge deploy / install / any real-site test                                                     | **NOT EXECUTED** (no credentials or dev site, B-002) |
+| Check                                                                                           | Result                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run lint` (ESLint + Prettier)                                                              | PASS                                                                                                                                                                                                                                 |
+| `npm run typecheck` (backend, shared, UI, e2e)                                                  | PASS                                                                                                                                                                                                                                 |
+| Vitest backend project                                                                          | 210 tests PASS (10 files)                                                                                                                                                                                                            |
+| Vitest macro-ui project (jsdom, axe)                                                            | 21 tests PASS (3 files)                                                                                                                                                                                                              |
+| Playwright (Chromium, real handlers, in-memory store, axe incl. contrast)                       | 6 tests PASS                                                                                                                                                                                                                         |
+| `npm run build` (shared, UI, bundle guard: no eval/storage/external URLs/duplicate ProseMirror) | PASS                                                                                                                                                                                                                                 |
+| `npm run validate:manifest` (schema + policy)                                                   | PASS                                                                                                                                                                                                                                 |
+| `npm run audit:deps` (production, high)                                                         | PASS; 6 moderate advisories remain                                                                                                                                                                                                   |
+| `forge lint`                                                                                    | PASS on 2026-11-01 ("No issues found")                                                                                                                                                                                               |
+| Forge deploy / install / real-site tests                                                        | Deploy (development, v2.0.0) and install on a Confluence Cloud site: done 2026-11-01. Export and site search: reported OK by the maintainer (no evidence stored). Spikes S1 to S7, QA section C and the rest of S8: **NOT EXECUTED** |
 
 ## Security properties: what is actually verified
 
@@ -42,7 +42,7 @@ Verified OFFLINE (our logic against an in-memory atomic store and a scripted Con
 - No plaintext content in logs, audit, revision metadata or storage keys; no browser storage use.
 - Retention, soft delete/purge, privacy anonymisation, 7-day reporting floor.
 
-**NOT verified (needs a real site):** actual KVS transaction/condition semantics and concurrency (S4, S5); `localId`/`content.id` stability and copy behaviour (S1, S2, S3); scopes versus endpoints (S7); exports, notifications, search, AI (S8); Forge iframe/CSP editor behaviour (S6); cross-site isolation; performance and cost at scale.
+**NOT verified (needs a real site):** actual KVS transaction/condition semantics and concurrency (S4, S5); `localId`/`content.id` stability and copy behaviour (S1, S2, S3); scopes versus endpoints (S7); notifications, page history, space export and AI search (S8; export and site search were later reported OK by the maintainer on 2026-11-01); Forge iframe/CSP editor behaviour (S6); cross-site isolation; performance and cost at scale.
 
 ## Defects found and fixed during the build
 

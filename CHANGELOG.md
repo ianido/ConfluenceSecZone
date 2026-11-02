@@ -8,7 +8,7 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 
 - Forge macro `secure-section-macro` with Custom UI (React 19, Tiptap 3), resolver, `adfExport` placeholder and daily maintenance trigger.
 - Domain: binding protocol, ACL with VIEW/MODIFY/ADMINISTER, final-administrator rule, revisions, hash-chained audit, retention, privacy anonymisation, site-admin recovery.
-- Storage adapter for Forge Custom Entity Store transactions (not yet executed against a live site).
+- Storage adapter for Forge Custom Entity Store transactions (deployed to a development environment on 2026-11-01; condition semantics and concurrency, spikes S4 and S5, are not yet verified).
 - English and Spanish UI, accessibility tests, Playwright UI tests (in-memory harness).
 - Documentation set (docs/), CI workflow, dependabot configuration, Marketplace material drafts.
 

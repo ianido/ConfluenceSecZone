@@ -1,7 +1,7 @@
 # Deployment, upgrade and rollback
 
-**Human approval required.** This repository's automation never deploys. Nothing here has been executed against
-Forge because no credentials or development site were available (docs/BLOCKERS.md B-001, B-002).
+**Human approval required.** This repository's automation never deploys. The development deployment and install were executed by the maintainer on 2026-11-01. Staging and production
+have not been used; most real-site checks are still open (docs/BLOCKERS.md B-002).
 
 ## Environments
 

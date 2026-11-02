@@ -2,7 +2,7 @@
 
 Test counts at last full run (2026-11-01 UTC): backend project 10 files / 210 tests PASS; macro-ui project 3 files / 21 tests PASS;
 Playwright 6 tests PASS (UI harness, not Forge). `npm run verify` exit 0. `npm run audit:deps` exit 0 (6 moderate remain).
-Not executed: `forge lint` (B-001), all real-site spikes (B-002).
+Not executed at the time of writing: `forge lint`, all real-site spikes. Update 2026-11-01: `forge lint` passed, the app was deployed and installed, and export and site search were reported OK; see docs/QA_MATRIX.md.
 
 Honest labelling: "OFFLINE" = against the in-memory store and fake Confluence; these prove our logic, not Forge behaviour.
 

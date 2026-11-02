@@ -5,15 +5,15 @@ platform facts this model rests on.
 
 ## 1. Security claims and honest status
 
-| Claim                                                                                                        | Status                                                                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A user with page access but no section grant never receives section content.                                 | Verified OFFLINE against test doubles; **REAL-SITE NOT EXECUTED**                                                                                                                 |
-| Identity, tenant, page and macro come only from the Forge resolver context.                                  | Verified by code structure and OFFLINE tests; depends on Atlassian's documented guarantee (finding 2.1)                                                                           |
-| Copying a page or macro cannot expose the original content.                                                  | Verified OFFLINE; real copy behaviour (S1) **NOT EXECUTED**                                                                                                                       |
-| The last administrator cannot be removed, even concurrently.                                                 | Verified OFFLINE with the in-memory store, which has atomic transactions by construction. Depends on Forge `transact` conditions behaving as documented (S4, S5) **NOT EXECUTED** |
-| Content is stored only in Forge storage and never in page body, macro config, URL, logs, or browser storage. | Verified OFFLINE (tests + bundle guard + lint rules)                                                                                                                              |
-| Exports never contain protected content.                                                                     | Implementation is a static placeholder; **which export paths call it is NOT EXECUTED (S8)**                                                                                       |
-| Audit log is tamper-**evident**, not immutable.                                                              | See 6                                                                                                                                                                             |
+| Claim                                                                                                        | Status                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A user with page access but no section grant never receives section content.                                 | Verified OFFLINE against test doubles; **REAL-SITE NOT EXECUTED**                                                                                                                                                                           |
+| Identity, tenant, page and macro come only from the Forge resolver context.                                  | Verified by code structure and OFFLINE tests; depends on Atlassian's documented guarantee (finding 2.1)                                                                                                                                     |
+| Copying a page or macro cannot expose the original content.                                                  | Verified OFFLINE; real copy behaviour (S1) **NOT EXECUTED**                                                                                                                                                                                 |
+| The last administrator cannot be removed, even concurrently.                                                 | Verified OFFLINE with the in-memory store, which has atomic transactions by construction. Depends on Forge `transact` conditions behaving as documented (S4, S5) **NOT EXECUTED**                                                           |
+| Content is stored only in Forge storage and never in page body, macro config, URL, logs, or browser storage. | Verified OFFLINE (tests + bundle guard + lint rules)                                                                                                                                                                                        |
+| Exports never contain protected content.                                                                     | Implementation is a static placeholder. Export and site search were reported OK by the maintainer on a real site (2026-11-01, no evidence stored); email, notifications, page history, space export and AI search are **NOT EXECUTED (S8)** |
+| Audit log is tamper-**evident**, not immutable.                                                              | See 6                                                                                                                                                                                                                                       |
 
 We do not claim the product is production ready. See docs/FINAL_REPORT.md.
 
@@ -62,29 +62,29 @@ installation-isolated (V); `transact` is atomic with conditions (V, behaviour sp
 `O` = offline test exists and passes. `R` = needs a real Confluence site: **NOT EXECUTED**, procedure in
 docs/QA_MATRIX.md.
 
-| Area                                       | Offline                                                    | Real site                                  |
-| ------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------ |
-| IDOR                                       | O (`lifecycle`, `security-matrix`)                         | R (QA-04)                                  |
-| Client context tampering                   | O (`security-matrix` spoofing, missing/malformed context)  | R (QA-05: edit bridge context in DevTools) |
-| Resolver authorization (all 19 functions)  | O (`security-matrix`, per function, three caller classes)  | R                                          |
-| Cross-installation isolation               | O (cloudId stamp)                                          | R (two sites, QA-14)                       |
-| Page restrictions                          | O (fake)                                                   | R (QA-06)                                  |
-| Group removal / deleted group              | O                                                          | R (QA-07)                                  |
-| Privileged admins (site admin cannot read) | O                                                          | R (QA-12)                                  |
-| Token/session expiry                       | n/a for resolver context; UI handles errors as UNAVAILABLE | R (QA-15)                                  |
-| Edit without page edit permission          | O                                                          | R                                          |
-| Stored XSS                                 | O (validator, jsdom, Chromium paste)                       | R (Forge iframe sandbox/CSP)               |
-| Reflected XSS                              | O (no URL/query state is read)                             | R                                          |
-| Macro config manipulation                  | O (config unused)                                          | R (QA-05)                                  |
-| Copied/duplicated pages                    | O                                                          | R (QA-08, S1)                              |
-| Unpublish / draft / page history           | not modelled                                               | R (QA-10, S1, S3)                          |
-| Export/PDF/email/notification/index        | O (placeholder only)                                       | R (QA-09, S8)                              |
-| Browser cache                              | O (no storage use; headers are platform controlled)        | R (QA-16)                                  |
-| ACL race conditions                        | O (in-memory atomic store)                                 | R (S5)                                     |
-| Final-admin rule                           | O (race tests)                                             | R                                          |
-| Orphan recovery                            | O                                                          | R (QA-12)                                  |
-| Oversized payloads / malformed JSON        | O                                                          | R (platform payload limits)                |
-| Denial of service / quotas                 | O (bounded work)                                           | R (QA-17 load)                             |
+| Area                                       | Offline                                                    | Real site                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| IDOR                                       | O (`lifecycle`, `security-matrix`)                         | R (QA-04)                                                                 |
+| Client context tampering                   | O (`security-matrix` spoofing, missing/malformed context)  | R (QA-05: edit bridge context in DevTools)                                |
+| Resolver authorization (all 19 functions)  | O (`security-matrix`, per function, three caller classes)  | R                                                                         |
+| Cross-installation isolation               | O (cloudId stamp)                                          | R (two sites, QA-14)                                                      |
+| Page restrictions                          | O (fake)                                                   | R (QA-06)                                                                 |
+| Group removal / deleted group              | O                                                          | R (QA-07)                                                                 |
+| Privileged admins (site admin cannot read) | O                                                          | R (QA-12)                                                                 |
+| Token/session expiry                       | n/a for resolver context; UI handles errors as UNAVAILABLE | R (QA-15)                                                                 |
+| Edit without page edit permission          | O                                                          | R                                                                         |
+| Stored XSS                                 | O (validator, jsdom, Chromium paste)                       | R (Forge iframe sandbox/CSP)                                              |
+| Reflected XSS                              | O (no URL/query state is read)                             | R                                                                         |
+| Macro config manipulation                  | O (config unused)                                          | R (QA-05)                                                                 |
+| Copied/duplicated pages                    | O                                                          | R (QA-08, S1)                                                             |
+| Unpublish / draft / page history           | not modelled                                               | R (QA-10, S1, S3)                                                         |
+| Export/PDF/email/notification/index        | O (placeholder only)                                       | R (QA-09, S8); export and search reported OK on 2026-11-01, the rest open |
+| Browser cache                              | O (no storage use; headers are platform controlled)        | R (QA-16)                                                                 |
+| ACL race conditions                        | O (in-memory atomic store)                                 | R (S5)                                                                    |
+| Final-admin rule                           | O (race tests)                                             | R                                                                         |
+| Orphan recovery                            | O                                                          | R (QA-12)                                                                 |
+| Oversized payloads / malformed JSON        | O                                                          | R (platform payload limits)                                               |
+| Denial of service / quotas                 | O (bounded work)                                           | R (QA-17 load)                                                            |
 
 ## 5. Authorization rules (normative)
 

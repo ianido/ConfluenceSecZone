@@ -3,7 +3,7 @@
 A Forge-only Confluence Cloud macro for confidential rich-text sections with their own permissions
 (VIEW < MODIFY < ADMINISTER), independent of page permissions. Data stays in Forge-hosted storage; no external servers.
 
-**Status: internal test candidate. Not production ready.** Real-site verification is pending, see
+**Status: internal test candidate. Not production ready.** Deployed and installed on a development environment (2026-11-01); export and site search were reported OK by the maintainer, but most real-site verification is still pending, see
 [docs/FINAL_REPORT.md](docs/FINAL_REPORT.md) and [docs/BLOCKERS.md](docs/BLOCKERS.md).
 
 ```bash
