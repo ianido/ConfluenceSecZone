@@ -18,7 +18,11 @@ run() {
 
 apply_ruleset() {
   local file="$1" name id=""
-  name=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["name"])' "$file")
+  # Node is already required by this repository; python is not available on every machine (for example Git Bash on Windows).
+  name=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).name)' "$file") || name=""
+  if [ -z "$name" ]; then
+    echo "FAIL  ruleset $file: could not read its name (is node installed?)"; FAILED=1; return
+  fi
   if [ "$DRY" = 0 ]; then
     id=$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name==\"$name\") | .id" 2>/dev/null || true)
   fi
