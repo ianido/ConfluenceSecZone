@@ -24,8 +24,8 @@ Contributions are welcome through pull requests only. Nothing is pushed directly
 passing CI, a signed history and an approval from the maintainer.
 
 1. Open an issue (bug or feature template). Security problems: see [SECURITY.md](SECURITY.md).
-2. Fork, then create a branch named `feat/<issue>-<description>`, `fix/<issue>-<description>`,
-   `hotfix/<issue>-<description>` or `refactor/<issue>-<description>` (or `chore/`, `docs/`, `test/`, `ci/`, `build/`,
+2. Fork, then create a branch named `feat/<description>`, `fix/<description>`,
+   `hotfix/<description>` or `refactor/<description>` (or `chore/`, `docs/`, `test/`, `ci/`, `build/`,
    `release/` plus a description).
 3. Run `npm ci && npm run verify` (and `npm run check:branch`).
 4. Open a pull request against `main`, fill in the template and address review comments.

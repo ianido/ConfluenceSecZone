@@ -46,9 +46,12 @@ If you add another maintainer, remove the bypass entry so every PR needs a secon
 
 The standard is the regular expression in [CONTRIBUTING.md](../CONTRIBUTING.md#branch-names). GitHub's native
 "restrict branch names" rule with a regex is only available on GitHub Enterprise Cloud organizations, so on a personal
-public repository it is enforced by the `branch-name` workflow (a required status check on pull requests, run with `pull_request_target` so the version on `main` is the one that executes and a PR cannot edit or replace it; the same
-workflow also fails pushes to wrongly named branches, which a ruleset could not block). If you ever move to an
-Enterprise organization, import `.github/rulesets/branch-naming.json` to block such branches at push time (it excludes `dependabot/**`).
+public repository it is enforced by the `branch-name` workflow: a required status check on pull requests, run with
+`pull_request_target` so the version on `main` is the one that executes and a PR cannot edit or replace it. It runs
+only on pull request events, never on pushes: a push run would share the check name, and a maintainer rebasing a
+Dependabot branch would make it fail (the pusher is the maintainer, not Dependabot). A branch pushed without a PR is
+therefore not checked. If you ever move to an Enterprise organization, import `.github/rulesets/branch-naming.json`
+to block such branches at push time (it excludes `dependabot/**`).
 
 Known consequences:
 
