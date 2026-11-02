@@ -5,11 +5,25 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    ignore:
+      # eslint 10 and @eslint/js 10: eslint-plugin-jsx-a11y@6 only supports eslint <= 9 (npm ci fails with ERESOLVE).
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+      # typescript 7: typescript-eslint@8 only supports typescript < 6.1.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # The Forge runtime and .nvmrc are Node 24; do not type against a newer Node.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       forge:
         patterns: ['@forge/*']
+        update-types: [minor, patch]
       tiptap-prosemirror:
         patterns: ['@tiptap/*', 'prosemirror-*']
+        update-types: [minor, patch]
       tooling:
         patterns:
           [
@@ -21,6 +35,7 @@ updates:
             '@vitest/*',
             '@playwright/*',
           ]
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
