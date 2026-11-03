@@ -19,6 +19,9 @@ describe('App states', () => {
     const api = scriptedApi({ getSection: () => readyView() });
     const { container } = renderWithI18n(<App api={api} />);
     expect(screen.getByRole('status').textContent).toContain('Loading');
+    expect(await screen.findByRole('heading', { name: /Unlock it to read/ })).toBeTruthy();
+    expect(screen.queryByText('Quarterly numbers')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
     expect(await screen.findByText('Quarterly numbers')).toBeTruthy();
     await expectNoA11yViolations(container);
   });
@@ -95,7 +98,7 @@ describe('App states', () => {
     renderWithI18n(<App api={api} />);
     await screen.findByText('Temporarily unavailable');
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText('Quarterly numbers')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Unlock' })).toBeTruthy();
   });
 
   it('unavailable when the bridge itself throws', async () => {
@@ -128,7 +131,7 @@ describe('App states', () => {
     expect(await screen.findByText('Set up your secure section')).toBeTruthy();
     await expectNoA11yViolations(container);
     await userEvent.click(screen.getByRole('button', { name: 'Set up secure section' }));
-    expect(await screen.findByText('Quarterly numbers')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Unlock' })).toBeTruthy();
   });
 
   it('unconfigured without edit rights cannot create', async () => {
@@ -142,7 +145,7 @@ describe('App states', () => {
     let n = 0;
     const api = scriptedApi({ getSection: () => (n++ === 0 ? readyView() : { state: 'DENIED' }) });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     await userEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(await screen.findByText('Your access was removed')).toBeTruthy();
   });
@@ -156,7 +159,7 @@ describe('App states', () => {
   it('role-based tabs: VIEW sees only content and help', async () => {
     const api = scriptedApi({ getSection: () => readyView({ role: 'VIEW', canWrite: false }) });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Content', 'Help']);
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
   });
@@ -166,7 +169,7 @@ describe('App states', () => {
       getSection: () => readyView({ role: 'MODIFY', canWrite: false, canEditPage: false }),
     });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
       'Content',
       'History',
@@ -182,7 +185,7 @@ describe('App states', () => {
       listGrants: () => ({ ok: false, code: 'DENIED' }),
     });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((t) => t.textContent)).toEqual([
       'Content',
@@ -248,7 +251,7 @@ describe('Section header', () => {
   it('non-administrators get no edit or manage controls', async () => {
     const api = scriptedApi({ getSection: () => readyView({ role: 'VIEW', canWrite: false }) });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     expect(screen.queryByRole('button', { name: 'Edit details' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Manage access' })).toBeNull();
   });
@@ -266,7 +269,7 @@ describe('Section header', () => {
     await userEvent.type(await screen.findByLabelText('Title'), 'HR memo');
     await userEvent.selectOptions(screen.getByLabelText('Classification'), 'INTERNAL');
     await userEvent.click(screen.getByRole('button', { name: 'Set up secure section' }));
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     expect(api.calls.find((c) => c.fn === 'createSection')?.payload).toEqual({
       title: 'HR memo',
       classification: 'INTERNAL',
@@ -286,7 +289,7 @@ describe('Section header', () => {
     renderWithI18n(<App api={api} />);
     await userEvent.click(await screen.findByRole('radio', { name: /Credentials/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Set up secure section' }));
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     expect(api.calls.find((c) => c.fn === 'createSection')?.payload).toMatchObject({
       template: 'credentials',
     });
@@ -343,7 +346,7 @@ describe('Permissions panel', () => {
       upsertGrant: () => ({ ok: false, code: 'LAST_ADMINISTRATOR' }),
     });
     const { container } = renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     await userEvent.click(screen.getByRole('tab', { name: 'Permissions' }));
     await screen.findByText('Who can access this section');
     expect(screen.getByText('Unavailable account or group')).toBeTruthy();
@@ -365,7 +368,7 @@ describe('Permissions panel', () => {
       revokeGrant: () => ({ ok: true, data: { ...grants.data, grants: [grants.data.grants[0]] } }),
     });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     await userEvent.click(screen.getByRole('tab', { name: 'Permissions' }));
     await screen.findByText('Who can access this section');
     await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1] as HTMLElement);
@@ -410,7 +413,7 @@ describe('Permissions panel', () => {
       resolveAccessRequest: () => ({ ok: true, data: { requests: [], aclVersion: 4 } }),
     });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     expect(await screen.findByLabelText(/1 pending requests/)).toBeTruthy();
     await userEvent.click(screen.getByRole('tab', { name: /Permissions/ }));
     expect(await screen.findByText(/Bob asks for: Can view/)).toBeTruthy();
@@ -482,7 +485,7 @@ describe('History panel', () => {
       }),
     });
     renderWithI18n(<App api={api} />);
-    await screen.findByText('Quarterly numbers');
+    await screen.findByRole('button', { name: 'Unlock' });
     await userEvent.click(screen.getByRole('tab', { name: 'History' }));
     expect(await screen.findByText(/raise Technology/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Compare with previous' }));
@@ -523,6 +526,8 @@ describe('Protected reading', () => {
       revealSecret: () => ({ ok: true, data: { recorded: true } }),
     });
     const { container } = renderWithI18n(<App api={api} />);
+    expect(screen.queryByText('super-secret-value')).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }));
     expect(await screen.findByText(/Visible to Alice/)).toBeTruthy();
     expect(container.querySelector('.ss-protect')).not.toBeNull();
     expect(container.textContent).not.toContain('super-secret-value');

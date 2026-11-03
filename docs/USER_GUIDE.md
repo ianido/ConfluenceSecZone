@@ -55,7 +55,7 @@ History can label a version (40 characters). The label is not copied into Activi
 
 ## Reading a restricted section
 
-A Restricted section can show your name and the date as a watermark, a countdown until it locks, and **Lock now**. Internal and Confidential sections show the countdown only when a site administrator turns auto-lock on. Lock now is always available while you are reading. The section can also discourage selecting or printing. This makes casual copying harder. It does not stop someone who can view the section from reading the stored text. Unlocking loads the section again.
+Every section opens locked, including for an administrator. Choose **Unlock** to read it. A Restricted section can then show your name and the date as a watermark, a countdown until it locks again, and **Lock now**. Internal and Confidential sections show the countdown only when a site administrator turns auto-lock on. The section can also discourage selecting or printing. This makes casual copying harder. It does not stop someone who can view the section from reading the stored text. Unlocking loads the section again.
 
 ## My secure sections
 

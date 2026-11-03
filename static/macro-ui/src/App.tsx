@@ -426,15 +426,20 @@ function ProtectedReading({
   api,
   doc,
   protection,
+  locked,
+  lockReason,
+  onLock,
   onUnlock,
 }: {
   api: Api;
   doc: RichDoc;
   protection: ProtectionFlags;
+  locked: boolean;
+  lockReason: 'initial' | 'idle';
+  onLock: (reason: 'idle') => void;
   onUnlock: () => void;
 }) {
   const t = useT();
-  const [locked, setLocked] = useState(false);
   const [leftMs, setLeftMs] = useState<number | null>(
     protection.autoLockMinutes ? protection.autoLockMinutes * 60_000 : null,
   );
@@ -443,14 +448,14 @@ function ProtectedReading({
     const ms = protection.autoLockMinutes * 60_000;
     let idleFrom = Date.now();
     setLeftMs(ms);
-    let lockTimer = window.setTimeout(() => setLocked(true), ms);
+    let lockTimer = window.setTimeout(() => onLock('idle'), ms);
     const tick = window.setInterval(() => {
       setLeftMs(Math.max(0, ms - (Date.now() - idleFrom)));
     }, 1000);
     const bump = () => {
       idleFrom = Date.now();
       window.clearTimeout(lockTimer);
-      lockTimer = window.setTimeout(() => setLocked(true), ms);
+      lockTimer = window.setTimeout(() => onLock('idle'), ms);
     };
     window.addEventListener('pointerdown', bump);
     window.addEventListener('keydown', bump);
@@ -460,19 +465,12 @@ function ProtectedReading({
       window.removeEventListener('pointerdown', bump);
       window.removeEventListener('keydown', bump);
     };
-  }, [locked, protection.autoLockMinutes]);
+  }, [locked, onLock, protection.autoLockMinutes]);
   if (locked) {
     return (
       <section className="ss-card ss-warn" role="status">
-        <h2>{t('protect.locked')}</h2>
-        <button
-          type="button"
-          className="ss-btn"
-          onClick={() => {
-            setLocked(false);
-            onUnlock();
-          }}
-        >
+        <h2>{lockReason === 'idle' ? t('protect.locked') : t('protect.locked.initial')}</h2>
+        <button type="button" className="ss-btn ss-primary" onClick={onUnlock}>
           {t('protect.unlock')}
         </button>
       </section>
@@ -490,7 +488,7 @@ function ProtectedReading({
         {protection.autoLockMinutes !== null && leftMs !== null && (
           <span className="ss-muted">{t('protect.countdown', { time: remain })}</span>
         )}
-        <button type="button" className="ss-btn" onClick={() => setLocked(true)}>
+        <button type="button" className="ss-btn" onClick={() => onLock('idle')}>
           {t('protect.lockNow')}
         </button>
       </div>
@@ -526,6 +524,21 @@ function Ready({
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(0);
   const isAdmin = roleAtLeast(view.role, 'ADMINISTER');
+  const [locked, setLocked] = useState(() => !docIsEmpty(content.doc));
+  const [lockReason, setLockReason] = useState<'initial' | 'idle'>('initial');
+  const lockIdle = useCallback(() => {
+    setLockReason('idle');
+    setLocked(true);
+  }, []);
+  const seenVersion = useRef(content.version);
+  useEffect(() => {
+    if (seenVersion.current === content.version) return;
+    seenVersion.current = content.version;
+    if (!docIsEmpty(content.doc)) {
+      setLocked(true);
+      setLockReason('initial');
+    }
+  }, [content.doc, content.version]);
   const tabs: Tab[] = ['content'];
   if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('permissions');
   if (roleAtLeast(view.role, 'MODIFY')) tabs.push('history');
@@ -633,7 +646,10 @@ function Ready({
                   api={api}
                   doc={content.doc}
                   protection={view.protection}
-                  onUnlock={reload}
+                  locked={locked}
+                  lockReason={lockReason}
+                  onLock={lockIdle}
+                  onUnlock={() => setLocked(false)}
                 />
               )}
               <p className="ss-muted ss-saved">
@@ -644,7 +660,7 @@ function Ready({
                 })}
               </p>
               <div className="ss-actions">
-                {view.canWrite && (
+                {view.canWrite && !locked && (
                   <button
                     type="button"
                     className="ss-btn ss-primary"
