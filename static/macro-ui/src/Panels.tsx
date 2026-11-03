@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   GRANT_EXPIRY_PRESETS_DAYS,
   ROLES,
+  diffDocs,
   type AuditList,
   type Diagnostics,
   type EffectiveAccess,
@@ -458,6 +459,11 @@ export function HistoryPanel({
   const t = useT();
   const hist = useLoad<RevisionList>(async () => unwrap(await api.call('listRevisions', {})));
   const [preview, setPreview] = useState<{ version: number; doc: RichDoc } | null>(null);
+  const [compare, setCompare] = useState<{
+    from: number;
+    to: number;
+    lines: ReturnType<typeof diffDocs>;
+  } | null>(null);
   const [confirm, setConfirm] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -475,6 +481,7 @@ export function HistoryPanel({
             <span>
               v{r.version} · {fmt(r.createdAt)} · {r.author?.displayName ?? '—'}
               {r.restoredFrom ? ` · ↩ v${r.restoredFrom}` : ''}
+              {r.changeNote ? ` · ${r.changeNote}` : ''}
             </span>
             <button
               type="button"
@@ -490,6 +497,27 @@ export function HistoryPanel({
             {canWrite && r.version !== baseVersion && (
               <button type="button" className="ss-btn" onClick={() => setConfirm(r.version)}>
                 {t('action.restore')}
+              </button>
+            )}
+            {r.version > 1 && (
+              <button
+                type="button"
+                className="ss-btn"
+                onClick={async () => {
+                  const [a, b] = await Promise.all([
+                    safeCall(api, 'getRevision', { version: r.version - 1 }),
+                    safeCall(api, 'getRevision', { version: r.version }),
+                  ]);
+                  if (a.ok && b.ok) {
+                    setCompare({
+                      from: r.version - 1,
+                      to: r.version,
+                      lines: diffDocs(a.data.doc, b.data.doc),
+                    });
+                  } else setError(t('error.generic'));
+                }}
+              >
+                {t('history.compare')}
               </button>
             )}
           </li>
@@ -527,6 +555,41 @@ export function HistoryPanel({
           <RichRenderer doc={preview.doc} />
           <button type="button" className="ss-btn" onClick={() => setPreview(null)}>
             {t('action.close')}
+          </button>
+        </div>
+      )}
+      {compare && (
+        <div
+          className="ss-preview"
+          aria-label={t('history.compare.title', { from: compare.from, to: compare.to })}
+        >
+          <h3>{t('history.compare.title', { from: compare.from, to: compare.to })}</h3>
+          {compare.lines.every((l) => l.kind === 'equal') ? (
+            <p className="ss-muted">{t('history.compare.empty')}</p>
+          ) : (
+            <>
+              <p className="ss-muted">
+                {t('history.compare.stats', {
+                  added: compare.lines.filter((l) => l.kind === 'add').length,
+                  removed: compare.lines.filter((l) => l.kind === 'del').length,
+                })}
+              </p>
+              <pre
+                className="ss-diff"
+                aria-label={t('history.compare.title', { from: compare.from, to: compare.to })}
+              >
+                {compare.lines.map((l, i) => (
+                  <span key={i} className={`ss-diff-${l.kind}`}>
+                    {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '- ' : '  '}
+                    {l.text || ' '}
+                    {'\n'}
+                  </span>
+                ))}
+              </pre>
+            </>
+          )}
+          <button type="button" className="ss-btn" onClick={() => setCompare(null)}>
+            {t('history.closeCompare')}
           </button>
         </div>
       )}

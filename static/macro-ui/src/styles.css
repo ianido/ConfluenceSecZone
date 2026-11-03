@@ -418,3 +418,28 @@ select {
 .ss-access-title {
   margin: 0;
 }
+.ss-change-note {
+  margin-top: 12px;
+  max-width: 480px;
+}
+.ss-diff {
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--ss-bg-raised);
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.ss-diff-add {
+  background: color-mix(in srgb, var(--ss-ok) 18%, transparent);
+  display: block;
+}
+.ss-diff-del {
+  background: color-mix(in srgb, var(--ss-danger) 18%, transparent);
+  display: block;
+  text-decoration: line-through;
+}
+.ss-diff-equal {
+  display: block;
+}

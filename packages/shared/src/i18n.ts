@@ -189,6 +189,13 @@ const en = {
   'perm.lastAccess': 'Last access',
   'perm.lastAccess.never': 'Never',
   'perm.renew': 'Renew',
+  'editor.changeNote': 'What changed? (optional)',
+  'editor.changeNote.placeholder': 'For example: raise Technology to 6%',
+  'history.compare': 'Compare with previous',
+  'history.compare.title': 'Changes from v{from} to v{to}',
+  'history.compare.empty': 'These versions look the same.',
+  'history.compare.stats': '{added} added · {removed} removed',
+  'history.closeCompare': 'Close comparison',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -383,6 +390,13 @@ const es: Record<MessageKey, string> = {
   'perm.lastAccess': 'Último acceso',
   'perm.lastAccess.never': 'Nunca',
   'perm.renew': 'Renovar',
+  'editor.changeNote': '¿Qué cambió? (opcional)',
+  'editor.changeNote.placeholder': 'Por ejemplo: sube Tecnología a 6 %',
+  'history.compare': 'Comparar con la anterior',
+  'history.compare.title': 'Cambios de v{from} a v{to}',
+  'history.compare.empty': 'Estas versiones se ven iguales.',
+  'history.compare.stats': '{added} añadidas · {removed} eliminadas',
+  'history.closeCompare': 'Cerrar comparación',
 };
 
 const CATALOGS: Record<Locale, Record<MessageKey, string>> = { en, es };

@@ -38,6 +38,20 @@ describe('content versions', () => {
     ]);
   });
 
+  it('stores an optional change note on the revision and never puts it in the audit payload', async () => {
+    const w = await world();
+    await w.service.saveContent(alice, doc('one'), 1, 'raise Technology');
+    const hist = await w.service.listRevisions(alice, null);
+    expect(hist.revisions.find((r) => r.version === 2)?.changeNote).toBe('raise Technology');
+    const audit = await w.service.listAudit(alice, null);
+    expect(JSON.stringify(audit)).not.toContain('raise Technology');
+    await expect(
+      w.service.saveContent(alice, doc('two'), 2, 'x'.repeat(141)),
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+  });
+
   it('detects concurrent edits (optimistic concurrency) and never silently overwrites', async () => {
     const w = await world();
     const [a, b] = await Promise.allSettled([

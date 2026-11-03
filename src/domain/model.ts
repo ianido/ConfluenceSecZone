@@ -99,6 +99,7 @@ export interface RevisionDoc {
   authorAccountId: string;
   createdAt: string;
   restoredFrom: number | null;
+  changeNote?: string | null;
 }
 
 export type AuditMeta = Record<string, string | number | boolean | null>;

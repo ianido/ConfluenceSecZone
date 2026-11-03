@@ -87,7 +87,9 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     createSection: guarded('createSection', (ctx, p) =>
       service.createSection(ctx, p.title, p.classification),
     ),
-    saveContent: guarded('saveContent', (ctx, p) => service.saveContent(ctx, p.doc, p.baseVersion)),
+    saveContent: guarded('saveContent', (ctx, p) =>
+      service.saveContent(ctx, p.doc, p.baseVersion, p.changeNote),
+    ),
     listRevisions: guarded('listRevisions', (ctx, p) => service.listRevisions(ctx, p.cursor)),
     getRevision: guarded('getRevision', (ctx, p) => service.getRevision(ctx, p.version)),
     restoreRevision: guarded('restoreRevision', (ctx, p) =>

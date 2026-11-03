@@ -11,6 +11,7 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import {
+  CHANGE_NOTE_MAX_LENGTH,
   isSafeHref,
   safeValidateDoc,
   type ContentPayload,
@@ -95,6 +96,7 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState<ContentPayload | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [changeNote, setChangeNote] = useState('');
   const initialJson = useRef(JSON.stringify(initial.doc));
   const [words, setWords] = useState(0);
 
@@ -139,7 +141,13 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
     setSaving(true);
     setMessage(null);
     try {
-      const res = unwrap(await api.call('saveContent', { doc: check.doc, baseVersion }));
+      const res = unwrap(
+        await api.call('saveContent', {
+          doc: check.doc,
+          baseVersion,
+          ...(changeNote.trim() ? { changeNote: changeNote.trim() } : {}),
+        }),
+      );
       initialJson.current = JSON.stringify(res.content.doc);
       setDirty(false);
       setConflict(null);
@@ -161,7 +169,7 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [api, baseVersion, editor, onSaved, saving, t]);
+  }, [api, baseVersion, changeNote, editor, onSaved, saving, t]);
 
   const cancel = () => {
     if (dirty && !confirmDiscard) {
@@ -184,6 +192,16 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
     <section aria-label={t('editor.label')} className="ss-edit" onKeyDown={onKeyDown}>
       {editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
+      <label className="ss-change-note">
+        {t('editor.changeNote')}
+        <input
+          value={changeNote}
+          maxLength={CHANGE_NOTE_MAX_LENGTH}
+          placeholder={t('editor.changeNote.placeholder')}
+          onChange={(e) => setChangeNote(e.target.value)}
+          autoComplete="off"
+        />
+      </label>
       <div className="ss-actions">
         <button
           type="button"

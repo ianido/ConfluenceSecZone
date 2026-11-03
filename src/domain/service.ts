@@ -1,4 +1,5 @@
 import {
+  CHANGE_NOTE_MAX_LENGTH,
   EMPTY_DOC,
   REQUEST_REASON_MAX_LENGTH,
   roleAtLeast,
@@ -176,6 +177,7 @@ export class SecureSectionService {
     doc: RichDoc,
     author: string,
     restoredFrom: number | null,
+    changeNote: string | null = null,
   ): RevisionDoc {
     const bodyJson = JSON.stringify(doc);
     return {
@@ -188,6 +190,7 @@ export class SecureSectionService {
       authorAccountId: author,
       createdAt: this.nowIso(),
       restoredFrom,
+      ...(changeNote ? { changeNote } : {}),
     };
   }
 
@@ -446,13 +449,21 @@ export class SecureSectionService {
     ctx: TrustedContext,
     rawDoc: unknown,
     baseVersion: unknown,
+    rawNote?: unknown,
   ): Promise<{ content: ContentPayload }> {
     if (typeof baseVersion !== 'number' || !Number.isInteger(baseVersion) || baseVersion < 1) {
       throw new DomainError('INVALID_REQUEST');
     }
     const v = safeValidateDoc(rawDoc);
     if (!v.ok) throw new DomainError('INVALID_CONTENT');
-    return this.writeVersion(ctx, v.doc, baseVersion, null, 'CONTENT_EDIT');
+    return this.writeVersion(
+      ctx,
+      v.doc,
+      baseVersion,
+      null,
+      'CONTENT_EDIT',
+      parseChangeNote(rawNote),
+    );
   }
 
   private async writeVersion(
@@ -461,6 +472,7 @@ export class SecureSectionService {
     baseVersion: number,
     restoredFrom: number | null,
     action: 'CONTENT_EDIT' | 'CONTENT_RESTORE',
+    changeNote: string | null = null,
   ): Promise<{ content: ContentPayload }> {
     return this.withRetry(async () => {
       const r = await this.requireBound(ctx, 'MODIFY', {
@@ -479,7 +491,14 @@ export class SecureSectionService {
         ...(restoredFrom !== null ? { restoredFrom } : {}),
       });
       next.auditHead = audit.hash;
-      const rev = this.buildRevision(s.sectionId, version, doc, ctx.accountId, restoredFrom);
+      const rev = this.buildRevision(
+        s.sectionId,
+        version,
+        doc,
+        ctx.accountId,
+        restoredFrom,
+        changeNote,
+      );
       await this.store.transact([this.putSection(r.section, next), this.revisionOp(rev), op]);
       return {
         content: {
@@ -516,6 +535,7 @@ export class SecureSectionService {
       author: authors.get(v.authorAccountId) ?? null,
       restoredFrom: v.restoredFrom,
       bytes: v.bytes,
+      changeNote: v.changeNote ?? null,
     };
   }
 
@@ -1461,6 +1481,17 @@ function parseTitle(v: unknown): string | null {
   const t = v.trim();
   if (t === '') return null;
   if (t.length > TITLE_MAX_LENGTH || hasControlChars(t)) {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  return t;
+}
+
+function parseChangeNote(v: unknown): string | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'string') throw new DomainError('INVALID_REQUEST');
+  const t = v.trim();
+  if (t === '') return null;
+  if (t.length > CHANGE_NOTE_MAX_LENGTH || hasControlChars(t)) {
     throw new DomainError('INVALID_REQUEST');
   }
   return t;

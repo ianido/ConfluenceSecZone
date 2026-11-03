@@ -185,12 +185,15 @@ export interface PrincipalHit {
   label: string;
 }
 
+export const CHANGE_NOTE_MAX_LENGTH = 140;
+
 export interface RevisionSummary {
   version: number;
   createdAt: string;
   author: UserSummary | null;
   restoredFrom: number | null;
   bytes: number;
+  changeNote: string | null;
 }
 
 export interface RevisionList {
@@ -254,7 +257,7 @@ export interface RequestMap {
     res: Result<SectionView>;
   };
   saveContent: {
-    req: { doc: unknown; baseVersion: number };
+    req: { doc: unknown; baseVersion: number; changeNote?: string | null };
     res: Result<{ content: ContentPayload }>;
   };
   listRevisions: { req: { cursor?: string | null }; res: Result<RevisionList> };

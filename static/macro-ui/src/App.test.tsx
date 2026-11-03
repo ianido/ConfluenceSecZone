@@ -405,3 +405,70 @@ describe('Permissions panel', () => {
     });
   });
 });
+
+describe('History panel', () => {
+  it('compares a version with the previous one and shows added and removed lines', async () => {
+    const api = scriptedApi({
+      getSection: () => readyView(),
+      listRevisions: () => ({
+        ok: true,
+        data: {
+          nextCursor: null,
+          revisions: [
+            {
+              version: 2,
+              createdAt: '2026-01-02T00:00:00.000Z',
+              author: { accountId: 'alice', displayName: 'Alice' },
+              restoredFrom: null,
+              bytes: 10,
+              changeNote: 'raise Technology',
+            },
+            {
+              version: 1,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              author: { accountId: 'alice', displayName: 'Alice' },
+              restoredFrom: null,
+              bytes: 8,
+              changeNote: null,
+            },
+          ],
+        },
+      }),
+      getRevision: (p) => ({
+        ok: true,
+        data: {
+          doc: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: (p as { version: number }).version === 1 ? 'alpha' : 'beta',
+                  },
+                ],
+              },
+            ],
+          },
+          summary: {
+            version: (p as { version: number }).version,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            author: null,
+            restoredFrom: null,
+            bytes: 5,
+            changeNote: null,
+          },
+        },
+      }),
+    });
+    renderWithI18n(<App api={api} />);
+    await screen.findByText('Quarterly numbers');
+    await userEvent.click(screen.getByRole('tab', { name: 'History' }));
+    expect(await screen.findByText(/raise Technology/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Compare with previous' }));
+    expect(await screen.findByText(/Changes from v1 to v2/)).toBeTruthy();
+    expect(screen.getByText(/1 added/)).toBeTruthy();
+    expect(screen.getByText(/1 removed/)).toBeTruthy();
+  });
+});
