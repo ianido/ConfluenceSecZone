@@ -883,7 +883,26 @@ export class SecureSectionService {
       throw new DomainError('INVALID_REQUEST');
     const q = query.trim();
     if (q.length < 2 || q.length > 100) throw new DomainError('INVALID_REQUEST');
-    await this.requireBound(ctx, 'ADMINISTER', { op: 'acl-search', auditDenied: true });
+    const resolved = await this.authz.resolve(ctx);
+    if (resolved.kind === 'NO_ACCESS') throw new DomainError('DENIED');
+    if (resolved.kind === 'BOUND') {
+      if (!roleAtLeast(resolved.role.role, 'ADMINISTER')) {
+        if (resolved.role.role === null && !resolved.role.groupsComplete) {
+          throw new DomainError('UNAVAILABLE');
+        }
+        await this.recordDenied(resolved.section.value, ctx, 'acl-search');
+        throw new DomainError('DENIED');
+      }
+    } else if (!resolved.page.canEdit) {
+      throw new DomainError('DENIED');
+    } else if ((await this.readSitePolicy()).whoMayCreate === 'SITE_ADMINS') {
+      try {
+        if (!(await this.gateway.isSiteAdmin(ctx.accountId))) throw new DomainError('DENIED');
+      } catch (e) {
+        if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
+        throw e;
+      }
+    }
     try {
       const hits =
         type === 'USER' ? await this.gateway.searchUsers(q) : await this.gateway.searchGroups(q);

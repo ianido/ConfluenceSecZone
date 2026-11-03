@@ -35,7 +35,8 @@ shared copies.
 
 ## Editor extras
 
-- The heading control sets H1–H4. Typing `/` at the end of an empty token opens a menu for a table, a code block or a callout.
+- The heading control sets H1–H4. Typing `/` at the end of an empty token opens a menu for a table, a code block or a callout. The editor shows that hint under the text.
+- **Image** asks for a description and a file only after you choose it. The description is not kept on the toolbar.
 - **@** inserts a mention chip. A mention is a name on the page. It does not grant access.
 - Images must be a picture you pick from your computer (png, jpeg, gif or webp). The app stores the picture inside the section. Remote image addresses are rejected.
 - A **secret** field stores its value in the section. Anyone with Can view can read it. Showing or copying it records the field's label in Activity, never the value.
@@ -54,7 +55,7 @@ History can label a version (40 characters). The label is not copied into Activi
 
 ## Reading a restricted section
 
-A Restricted section can show your name and the date as a watermark, lock the text after a few minutes without activity, and discourage selecting or printing. Internal and Confidential sections do this only when a site administrator turns it on. This makes casual copying harder. It does not stop someone who can view the section from reading the stored text. Unlocking loads the section again.
+A Restricted section can show your name and the date as a watermark, a countdown until it locks, and **Lock now**. Internal and Confidential sections show the countdown only when a site administrator turns auto-lock on. Lock now is always available while you are reading. The section can also discourage selecting or printing. This makes casual copying harder. It does not stop someone who can view the section from reading the stored text. Unlocking loads the section again.
 
 ## My secure sections
 
@@ -64,7 +65,7 @@ If the page was deleted, the row says the page is missing. An administrator of t
 
 ## Starting from a template
 
-The setup wizard can start from a blank section, credentials, an HR note or meeting minutes. You can name one person to share with at creation (up to eight people in the API). The credentials template includes a Password field whose value is `replace-me`; replace it before you rely on it.
+The setup wizard offers four template cards: blank, credentials, an HR note, or meeting minutes. You can search for one person or group and a role to share with at creation (up to eight grants in the API). That search works before the section exists, and only for someone who is allowed to create it. The credentials template includes a Password field whose value is `replace-me`; replace it before you rely on it.
 
 The page byline **Secure sections** lists each section on that page: title, classification, and your role, or a prompt to request access. It does not show the text.
 

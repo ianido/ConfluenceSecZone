@@ -231,6 +231,7 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
         />
       )}
       <EditorContent editor={editor} />
+      <p className="ss-muted ss-editor-hint">{t('editor.hint')}</p>
       <label className="ss-change-note">
         {t('editor.changeNote')}
         <input
@@ -336,6 +337,7 @@ function Toolbar({
   const [secretLabel, setSecretLabel] = useState('');
   const [secretValue, setSecretValue] = useState('');
   const [imageAlt, setImageAlt] = useState('');
+  const [imagePrompt, setImagePrompt] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const headingLevel = editor.isActive('heading')
@@ -462,7 +464,7 @@ function Toolbar({
           }),
         t('callout.info'),
       )}
-      {btn(t('toolbar.image'), false, () => fileRef.current?.click(), '▣')}
+      {btn(t('toolbar.image'), imagePrompt, () => setImagePrompt(true), '▣')}
       {btn(t('toolbar.mention'), mentionQuery !== null, () => setMentionQuery(''), '@')}
       {btn(t('toolbar.secret'), secretOpen, () => setSecretOpen(true), '••')}
       {btn(
@@ -473,48 +475,60 @@ function Toolbar({
       )}
       {btn(t('toolbar.undo'), false, () => chain().undo().run(), <Icon>{ICONS.undo}</Icon>)}
       {btn(t('toolbar.redo'), false, () => chain().redo().run(), <Icon>{ICONS.redo}</Icon>)}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        className="ss-sr"
-        aria-label={t('toolbar.image')}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (!file) return;
-          if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
-            setImageError(t('image.invalid'));
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = () => {
-            const src = typeof reader.result === 'string' ? reader.result : '';
-            if (!isDataImage(src) || src.length > DOC_LIMITS.maxImageSrcLength) {
-              setImageError(t('image.tooLarge'));
-              return;
-            }
-            setImageError(null);
-            editor
-              .chain()
-              .focus()
-              .insertContent({ type: 'image', attrs: { src, alt: imageAlt.trim() } })
-              .run();
-          };
-          reader.readAsDataURL(file);
-        }}
-      />
-      <label>
-        <span className="ss-sr">{t('image.alt')}</span>
-        <input
-          value={imageAlt}
-          maxLength={DOC_LIMITS.maxAltLength}
-          placeholder={t('image.alt')}
-          aria-label={t('image.alt')}
-          onChange={(e) => setImageAlt(e.target.value)}
-        />
-      </label>
-      {imageError && <span role="alert">{imageError}</span>}
+      {imagePrompt && (
+        <div className="ss-image-prompt">
+          <label>
+            {t('image.alt')}
+            <input
+              value={imageAlt}
+              maxLength={DOC_LIMITS.maxAltLength}
+              placeholder={t('image.alt')}
+              aria-label={t('image.alt')}
+              onChange={(e) => setImageAlt(e.target.value)}
+            />
+          </label>
+          <button type="button" className="ss-btn" onClick={() => fileRef.current?.click()}>
+            {t('image.choose')}
+          </button>
+          <button type="button" className="ss-btn" onClick={() => setImagePrompt(false)}>
+            {t('action.close')}
+          </button>
+          {imageError && <span role="alert">{imageError}</span>}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="ss-sr"
+            aria-label={t('image.file')}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
+                setImageError(t('image.invalid'));
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => {
+                const src = typeof reader.result === 'string' ? reader.result : '';
+                if (!isDataImage(src) || src.length > DOC_LIMITS.maxImageSrcLength) {
+                  setImageError(t('image.tooLarge'));
+                  return;
+                }
+                setImageError(null);
+                setImagePrompt(false);
+                setImageAlt('');
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent({ type: 'image', attrs: { src, alt: imageAlt.trim() } })
+                  .run();
+              };
+              reader.readAsDataURL(file);
+            }}
+          />
+        </div>
+      )}
       <div className="ss-slash" role="menu" aria-label={t('toolbar.slash')} hidden={!slash}>
         <button
           type="button"

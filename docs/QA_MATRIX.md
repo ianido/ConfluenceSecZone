@@ -19,7 +19,7 @@ Forge's behaviour.
 | A-07 | Production dependency audit (high)                                                                                                            | `npm run audit:deps`                                                   | PASS (6 moderate remain)                  |
 | A-08 | `forge lint`                                                                                                                                  | `npm run forge:lint`                                                   | NOT EXECUTED (needs `forge login`, B-001) |
 | A-09 | Title/classification, access requests, temporary grants, history diff                                                                         | `npm test` (metadata, access-requests, expiry, diff, App/Editor)       | PASS                                      |
-| A-10 | Editor nodes, grant copy and page-restriction seed, revision labels, reader deterrence, My sections, site settings, templates and byline      | `npm test` (sharing, protection, home, admin, templates, content, App) | PASS (in the 374)                         |
+| A-10 | Editor nodes, grant copy and page-restriction seed, revision labels, reader deterrence, My sections, site settings, templates and byline      | `npm test` (sharing, protection, home, admin, templates, content, App) | PASS (in the 376)                         |
 
 Exact counts are recorded in docs/PROGRESS.md.
 

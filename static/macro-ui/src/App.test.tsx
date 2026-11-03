@@ -273,6 +273,24 @@ describe('Section header', () => {
       template: 'blank',
     });
   });
+
+  it('sends the credentials template chosen from the cards', async () => {
+    let created = false;
+    const api = scriptedApi({
+      getSection: () => (created ? readyView() : { state: 'UNCONFIGURED', canCreate: true }),
+      createSection: () => {
+        created = true;
+        return { ok: true, data: readyView() };
+      },
+    });
+    renderWithI18n(<App api={api} />);
+    await userEvent.click(await screen.findByRole('radio', { name: /Credentials/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Set up secure section' }));
+    await screen.findByText('Quarterly numbers');
+    expect(api.calls.find((c) => c.fn === 'createSection')?.payload).toMatchObject({
+      template: 'credentials',
+    });
+  });
 });
 
 describe('Permissions panel', () => {
@@ -511,5 +529,8 @@ describe('Protected reading', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reveal for 15 seconds' }));
     expect(container.textContent).toContain('super-secret-value');
     expect(api.calls.find((c) => c.fn === 'revealSecret')?.payload).toEqual({ label: 'Password' });
+    await userEvent.click(screen.getByRole('button', { name: 'Lock now' }));
+    expect(await screen.findByRole('heading', { name: /locked after a period/ })).toBeTruthy();
+    expect(container.textContent).not.toContain('super-secret-value');
   });
 });

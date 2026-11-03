@@ -42,6 +42,15 @@ describe('templates and the page byline', () => {
     expect(JSON.stringify(audit)).not.toContain('replace-me');
   });
 
+  it('lets a page editor search the directory before the section exists', async () => {
+    const w = await world();
+    const hits = await w.service.searchPrincipals(ctxFor('alice'), 'bo', 'USER');
+    expect(hits.hits.map((h) => h.principalId)).toContain('bob');
+    await expect(w.service.searchPrincipals(ctxFor('carol'), 'bo', 'USER')).rejects.toMatchObject({
+      code: 'DENIED',
+    });
+  });
+
   it('lists titles and the caller role on the page, never the content', async () => {
     const w = await world();
     await w.service.createSection(ctxFor('alice'), 'Roadmap', 'CONFIDENTIAL', {

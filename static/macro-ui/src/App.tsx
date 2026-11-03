@@ -173,7 +173,29 @@ function Unconfigured({
   const [shareLabel, setShareLabel] = useState('');
   const [shareRole, setShareRole] = useState<Role>('VIEW');
   const [shareHits, setShareHits] = useState<Array<{ id: string; label: string }>>([]);
+  const [shareKind, setShareKind] = useState<'USER' | 'GROUP'>('USER');
+  const [pickedKind, setPickedKind] = useState<'USER' | 'GROUP'>('USER');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = shareQuery.trim();
+    if (q.length < 2) {
+      setShareHits([]);
+      return undefined;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void safeCall(api, 'searchPrincipals', { query: q, type: shareKind }).then((res) => {
+        if (live && res.ok) {
+          setShareHits(res.data.hits.map((h) => ({ id: h.principalId, label: h.label })));
+        }
+      });
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [api, shareKind, shareQuery]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -236,45 +258,58 @@ function Unconfigured({
               </select>
             </label>
             <p className="ss-muted ss-meta-note">{t('meta.public.note')}</p>
-            <label>
-              {t('wizard.template')}
-              <select
-                value={template}
-                onChange={(e) => setTemplate(e.target.value as SectionTemplate)}
-              >
-                {SECTION_TEMPLATES.map((id) => (
-                  <option key={id} value={id}>
-                    {t(`wizard.template.${id}`)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {t('wizard.share')}
-              <input
-                value={shareQuery}
-                placeholder={t('perm.search.users')}
-                onChange={(e) => setShareQuery(e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="ss-btn"
-              disabled={shareQuery.trim().length < 2}
-              onClick={() => {
-                void safeCall(api, 'searchPrincipals', { query: shareQuery, type: 'USER' }).then(
-                  (res) => {
-                    if (res.ok) {
-                      setShareHits(
-                        res.data.hits.map((h) => ({ id: h.principalId, label: h.label })),
-                      );
-                    }
-                  },
-                );
-              }}
-            >
-              {t('perm.search.users')}
-            </button>
+            <div role="radiogroup" aria-label={t('wizard.template')} className="ss-templates">
+              {SECTION_TEMPLATES.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={template === id}
+                  className="ss-template"
+                  onClick={() => setTemplate(id)}
+                >
+                  <strong>{t(`wizard.template.${id}`)}</strong>
+                  <span>{t(`wizard.template.${id}.hint`)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="ss-share-row">
+              <label>
+                {t('wizard.share')}
+                <input
+                  value={shareQuery}
+                  placeholder={
+                    shareKind === 'GROUP' ? t('perm.search.groups') : t('perm.search.users')
+                  }
+                  onChange={(e) => setShareQuery(e.target.value)}
+                />
+              </label>
+              <label>
+                <select
+                  aria-label={t('wizard.share.kind')}
+                  value={shareKind}
+                  onChange={(e) => {
+                    const next = e.target.value === 'GROUP' ? 'GROUP' : 'USER';
+                    setShareKind(next);
+                    setShareHits([]);
+                  }}
+                >
+                  <option value="USER">{t('perm.user')}</option>
+                  <option value="GROUP">{t('perm.group')}</option>
+                </select>
+              </label>
+              <label>
+                <span className="ss-sr">{t('nav.permissions')}</span>
+                <select
+                  aria-label={t('nav.permissions')}
+                  value={shareRole}
+                  onChange={(e) => setShareRole(e.target.value as Role)}
+                >
+                  <option value="VIEW">{t('role.VIEW')}</option>
+                  <option value="MODIFY">{t('role.MODIFY')}</option>
+                </select>
+              </label>
+            </div>
             <ul>
               {shareHits.map((h) => (
                 <li key={h.id}>
@@ -284,6 +319,7 @@ function Unconfigured({
                     onClick={() => {
                       setShareId(h.id);
                       setShareLabel(h.label);
+                      setPickedKind(shareKind);
                     }}
                   >
                     {h.label}
@@ -294,14 +330,16 @@ function Unconfigured({
             {shareId && (
               <p>
                 {t('wizard.share.with', { name: shareLabel })}{' '}
-                <select
-                  aria-label={t('nav.permissions')}
-                  value={shareRole}
-                  onChange={(e) => setShareRole(e.target.value as Role)}
+                <button
+                  type="button"
+                  className="ss-btn"
+                  onClick={() => {
+                    setShareId('');
+                    setShareLabel('');
+                  }}
                 >
-                  <option value="VIEW">{t('role.VIEW')}</option>
-                  <option value="MODIFY">{t('role.MODIFY')}</option>
-                </select>
+                  {t('wizard.share.clear')}
+                </button>
               </p>
             )}
           </div>
@@ -321,7 +359,7 @@ function Unconfigured({
                         ? {
                             initialGrants: [
                               {
-                                principalType: 'USER' as const,
+                                principalType: pickedKind,
                                 principalId: shareId,
                                 role: shareRole,
                               },
@@ -397,18 +435,28 @@ function ProtectedReading({
 }) {
   const t = useT();
   const [locked, setLocked] = useState(false);
+  const [leftMs, setLeftMs] = useState<number | null>(
+    protection.autoLockMinutes ? protection.autoLockMinutes * 60_000 : null,
+  );
   useEffect(() => {
     if (!protection.autoLockMinutes || locked) return undefined;
     const ms = protection.autoLockMinutes * 60_000;
-    let timer = window.setTimeout(() => setLocked(true), ms);
+    let idleFrom = Date.now();
+    setLeftMs(ms);
+    let lockTimer = window.setTimeout(() => setLocked(true), ms);
+    const tick = window.setInterval(() => {
+      setLeftMs(Math.max(0, ms - (Date.now() - idleFrom)));
+    }, 1000);
     const bump = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setLocked(true), ms);
+      idleFrom = Date.now();
+      window.clearTimeout(lockTimer);
+      lockTimer = window.setTimeout(() => setLocked(true), ms);
     };
     window.addEventListener('pointerdown', bump);
     window.addEventListener('keydown', bump);
     return () => {
-      window.clearTimeout(timer);
+      window.clearTimeout(lockTimer);
+      window.clearInterval(tick);
       window.removeEventListener('pointerdown', bump);
       window.removeEventListener('keydown', bump);
     };
@@ -434,8 +482,18 @@ function ProtectedReading({
     name: protection.viewerName,
     date: new Date().toLocaleDateString(),
   });
+  const totalSec = leftMs === null ? 0 : Math.max(0, Math.ceil(leftMs / 1000));
+  const remain = `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
   return (
     <div className={protection.protectCopy ? 'ss-reading ss-protect' : 'ss-reading'}>
+      <div className="ss-protect-bar">
+        {protection.autoLockMinutes !== null && leftMs !== null && (
+          <span className="ss-muted">{t('protect.countdown', { time: remain })}</span>
+        )}
+        <button type="button" className="ss-btn" onClick={() => setLocked(true)}>
+          {t('protect.lockNow')}
+        </button>
+      </div>
       {protection.watermark && (
         <div className="ss-watermark" aria-hidden="true">
           {stamp}

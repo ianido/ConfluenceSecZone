@@ -1,6 +1,6 @@
 # Progress log
 
-Test counts at last full `npm run verify` (2026-11-03, 5:11 AM America/New_York): vitest 23 files / 374 tests PASS.
+Test counts at last full `npm run verify` (2026-11-03, 5:19 AM America/New_York): vitest 23 files / 376 tests PASS.
 Playwright 6 tests PASS (UI harness, not Forge). `npm run verify` exit 0. `npm run audit:deps` was not re-run (no dependency change; the previous result was exit 0 with 6 moderate remaining).
 Not executed: `forge lint` (B-001), all real-site spikes (B-002).
 
@@ -104,5 +104,5 @@ branch `cursor/secure-sections-forge-build-18af`, never push to protected branch
 
 - Commits on `feat/title-requests-expiry`: `b1ba7ff` (editor nodes), `96017be` (copy, seed, notices), `c72e026` (labels and side-by-side), `6dc3beb` (reader deterrence), `1be215e` (My secure sections), `0929c9b` (site settings), `e58e629` (templates and byline), `9956df5` (typecheck fixes), plus the docs commit that records them.
 - New scopes: `read:content.restriction:confluence`, `read:page:confluence`. Admin re-consent required. Not exercised on a live site.
-- `npm run verify` exit 0: vitest 23 files / 374 tests PASS, production build and manifest policy PASS. `npm run test:e2e` 6 PASS.
+- `npm run verify` exit 0: vitest 23 files / 376 tests PASS, production build and manifest policy PASS. `npm run test:e2e` 6 PASS.
 - Wiki still not updated (T-WIKI-1). Screenshots on a real site still open (T-UX-1). T-OPS-2 is implemented offline.

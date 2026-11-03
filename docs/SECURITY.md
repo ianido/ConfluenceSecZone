@@ -145,6 +145,9 @@ would be needed, which this product intentionally does not offer (no egress).
    receives the document. Screenshot, devtools and a second client are outside this control.
 9. **My sections, the byline and the CSV** return titles, classifications, roles and audit metadata. They are
    still personal data (who acted, which section). They do not return document bodies or request reasons.
+10. **Directory search before a section exists** is allowed only for a caller who could create that section
+    (page edit, and site administrator when policy says so). It returns directory hits, never section content.
+    On a section that already exists, search still requires ADMINISTER.
 
 ## 9. Reporting vulnerabilities
 
