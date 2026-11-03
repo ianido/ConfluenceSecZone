@@ -62,3 +62,4 @@ permissions:
     - read:confluence-user
     - read:confluence-groups
     - read:content-details:confluence
+    - read:content.restriction:confluence

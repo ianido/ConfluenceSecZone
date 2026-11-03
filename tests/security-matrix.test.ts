@@ -52,6 +52,12 @@ describe('resolver surface: every function denies unauthorised callers and leaks
       decision: 'APPROVE',
       expectedAclVersion: 1,
     },
+    copyGrants: {
+      sourceRef: '00000000-0000-4000-8000-000000000099',
+      expectedAclVersion: 1,
+    },
+    seedPageRestrictions: { expectedAclVersion: 1 },
+    dismissNotice: {},
   };
 
   for (const fn of RESOLVER_FUNCTIONS.filter((f) => f !== 'createSection')) {

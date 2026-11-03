@@ -20,6 +20,7 @@ export const LIMITS = {
   maxGroupPages: 10,
   maxPendingRequests: 50,
   maxAdminNamesShown: 5,
+  maxNotices: 20,
 } as const;
 
 export const REQUEST_TTL_DAYS = 30;
@@ -76,6 +77,8 @@ export interface SectionDoc {
   classification?: Classification | null;
   /** Pending access requests, bounded by LIMITS.maxPendingRequests and REQUEST_TTL_DAYS. */
   requests?: AccessRequestRec[];
+  /** In-app notices for people who were just granted access. Not a Confluence notification. */
+  notices?: Array<{ accountId: string; role: Role; addedBy: string; at: string }>;
 }
 
 export interface BindingDoc {

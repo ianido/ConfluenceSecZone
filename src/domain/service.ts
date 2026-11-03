@@ -26,6 +26,7 @@ import {
   type RichDoc,
   type SectionMeta,
   type SectionView,
+  type GrantNotice,
   type UserSummary,
   type AuditAction,
   MAX_GRANT_TTL_DAYS,
@@ -303,7 +304,11 @@ export class SecureSectionService {
     }
   }
 
-  private viewOf(r: BoundResolved, content: ContentPayload): SectionView {
+  private viewOf(
+    r: BoundResolved,
+    content: ContentPayload,
+    notice: GrantNotice | null,
+  ): SectionView {
     const role = r.role.role as Role;
     return {
       state: 'READY',
@@ -313,7 +318,32 @@ export class SecureSectionService {
       content,
       aclVersion: r.section.value.aclVersion,
       meta: this.metaOf(r.section.value),
+      notice,
     };
+  }
+
+  private async noticeFor(s: SectionDoc, accountId: string): Promise<GrantNotice | null> {
+    const n = (s.notices ?? []).find((x) => x.accountId === accountId);
+    if (!n) return null;
+    let addedByName = n.addedBy;
+    try {
+      const u = (await this.gateway.users([n.addedBy])).get(n.addedBy);
+      if (u?.displayName) addedByName = u.displayName;
+    } catch {
+      /* the note still shows; the name falls back to the account id */
+    }
+    return { role: n.role, addedByName, at: n.at };
+  }
+
+  private pushNotice(
+    s: SectionDoc,
+    accountId: string,
+    role: Role,
+    addedBy: string,
+    at: string,
+  ): NonNullable<SectionDoc['notices']> {
+    const rest = (s.notices ?? []).filter((n) => n.accountId !== accountId);
+    return [...rest, { accountId, role, addedBy, at }].slice(-LIMITS.maxNotices);
   }
 
   private metaOf(s: SectionDoc): SectionMeta {
@@ -327,14 +357,15 @@ export class SecureSectionService {
     };
   }
 
-  private async viewFor(r: Resolved): Promise<SectionView> {
+  private async viewFor(r: Resolved, accountId: string): Promise<SectionView> {
     if (r.kind === 'NO_ACCESS') return { state: 'DENIED' };
     if (r.kind === 'UNBOUND') return { state: 'UNCONFIGURED', canCreate: r.page.canEdit };
     if (r.role.role === null) {
       return r.role.groupsComplete ? { state: 'DENIED' } : { state: 'UNAVAILABLE' };
     }
     try {
-      return this.viewOf(r, await this.readHead(r.section.value));
+      const content = await this.readHead(r.section.value);
+      return this.viewOf(r, content, await this.noticeFor(r.section.value, accountId));
     } catch (e) {
       if (e instanceof CorruptedContentError) {
         this.logger.error('section.corrupted', { sectionId: r.section.value.sectionId });
@@ -347,7 +378,7 @@ export class SecureSectionService {
   // ---------------------------------------------------------------- read / create
 
   async getSection(ctx: TrustedContext): Promise<SectionView> {
-    return this.viewFor(await this.authz.resolve(ctx));
+    return this.viewFor(await this.authz.resolve(ctx), ctx.accountId);
   }
 
   async createSection(
@@ -360,7 +391,7 @@ export class SecureSectionService {
     return this.withRetry(async () => {
       const r = await this.authz.resolve(ctx);
       if (r.kind === 'NO_ACCESS') throw new DomainError('DENIED');
-      if (r.kind === 'BOUND') return this.viewFor(r); // idempotent: already created
+      if (r.kind === 'BOUND') return this.viewFor(r, ctx.accountId); // idempotent: already created
       if (!r.page.canEdit) throw new DomainError('PAGE_EDIT_REQUIRED');
       await this.assertPageBindingCap(ctx.pageId);
 
@@ -769,6 +800,9 @@ export class SecureSectionService {
         ...(s.requests && p.type === 'USER'
           ? { requests: s.requests.filter((x) => x.accountId !== p.id) }
           : {}),
+        ...(!existing && p.type === 'USER'
+          ? { notices: this.pushNotice(s, p.id, role, ctx.accountId, now) }
+          : {}),
       };
       const { audit, op } = this.chain(s, existing ? 'GRANT_UPDATE' : 'GRANT_ADD', ctx.accountId, {
         principalType: p.type,
@@ -864,6 +898,131 @@ export class SecureSectionService {
       next.auditHead = audit.hash;
       await this.store.transact([this.putSection(r.section, next), op]);
       return this.grantList(next);
+    });
+  }
+
+  async copyGrants(
+    ctx: TrustedContext,
+    sourceRef: unknown,
+    expectedAclVersion: unknown,
+  ): Promise<GrantList> {
+    if (typeof sourceRef !== 'string' || !UUID_RE.test(sourceRef)) throw new DomainError('DENIED');
+    const expected = parseVersion(expectedAclVersion);
+    return this.withRetry(async () => {
+      const target = await this.requireBound(ctx, 'ADMINISTER', {
+        op: 'acl-write',
+        auditDenied: true,
+      });
+      const source = await this.authz.resolveByRef(ctx, sourceRef);
+      // Same answer for a missing section and a section the caller does not administer.
+      if (!source || !roleAtLeast(source.role.role, 'ADMINISTER')) throw new DomainError('DENIED');
+      const s = target.section.value;
+      if (source.section.value.sectionId === s.sectionId) return this.grantList(s);
+      if (s.aclVersion !== expected)
+        throw new DomainError('CONFLICT', { currentAclVersion: s.aclVersion });
+      return this.mergeGrants(ctx, target, source.section.value.grants, 'copy');
+    });
+  }
+
+  async seedPageRestrictions(ctx: TrustedContext, expectedAclVersion: unknown): Promise<GrantList> {
+    const expected = parseVersion(expectedAclVersion);
+    let hits;
+    try {
+      hits = await this.gateway.pageRestrictions(ctx.pageId);
+    } catch (e) {
+      if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
+      throw e;
+    }
+    return this.withRetry(async () => {
+      const target = await this.requireBound(ctx, 'ADMINISTER', {
+        op: 'acl-write',
+        auditDenied: true,
+      });
+      const s = target.section.value;
+      if (s.aclVersion !== expected)
+        throw new DomainError('CONFLICT', { currentAclVersion: s.aclVersion });
+      const best = new Map<string, { type: PrincipalType; id: string; role: Role }>();
+      for (const hit of hits) {
+        const key = `${hit.principalType}:${hit.principalId}`;
+        const role: Role = hit.operation === 'update' ? 'MODIFY' : 'VIEW';
+        const prev = best.get(key);
+        if (!prev || roleAtLeast(role, prev.role))
+          best.set(key, { type: hit.principalType, id: hit.principalId, role });
+      }
+      const incoming: SectionDoc['grants'] = [];
+      for (const item of best.values()) {
+        if (!(await this.principalAlive(item.type, item.id))) continue;
+        incoming.push({
+          principalType: item.type,
+          principalId: item.id,
+          role: item.role,
+          addedAt: this.nowIso(),
+          addedBy: ctx.accountId,
+        });
+      }
+      return this.mergeGrants(ctx, target, incoming, 'page');
+    });
+  }
+
+  private async principalAlive(type: PrincipalType, id: string): Promise<boolean> {
+    try {
+      if (type === 'USER') return (await this.gateway.users([id])).get(id)?.active === true;
+      return (await this.gateway.groups([id])).get(id)?.exists === true;
+    } catch (e) {
+      if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
+      throw e;
+    }
+  }
+
+  /** Add grants that are not already present. Never removes or downgrades an existing grant. */
+  private async mergeGrants(
+    ctx: TrustedContext,
+    target: BoundResolved,
+    incoming: SectionDoc['grants'],
+    via: 'copy' | 'page',
+  ): Promise<GrantList> {
+    const s = target.section.value;
+    const have = new Set(s.grants.map((g) => `${g.principalType}:${g.principalId}`));
+    const now = this.clock.now().getTime();
+    const fresh = incoming.filter((g) => {
+      if (have.has(`${g.principalType}:${g.principalId}`)) return false;
+      return !g.expiresAt || Date.parse(g.expiresAt) > now;
+    });
+    if (fresh.length === 0) return this.grantList(s);
+    if (s.grants.length + fresh.length > LIMITS.maxGrants) throw new DomainError('RATE_LIMITED');
+    const at = this.nowIso();
+    let notices = s.notices ?? [];
+    const added = fresh.map((g) => ({ ...g, addedAt: at, addedBy: ctx.accountId }));
+    for (const g of added) {
+      if (g.principalType === 'USER') {
+        notices = this.pushNotice({ ...s, notices }, g.principalId, g.role, ctx.accountId, at);
+      }
+    }
+    const next: SectionDoc = {
+      ...s,
+      grants: [...s.grants, ...added],
+      notices,
+      aclVersion: s.aclVersion + 1,
+      updatedAt: at,
+    };
+    const { audit, op } = this.chain(s, 'GRANT_ADD', ctx.accountId, {
+      via,
+      added: added.length,
+    });
+    next.auditHead = audit.hash;
+    await this.store.transact([this.putSection(target.section, next), op]);
+    return this.grantList(next);
+  }
+
+  async dismissNotice(ctx: TrustedContext): Promise<{ dismissed: true }> {
+    return this.withRetry(async () => {
+      const r = await this.requireBound(ctx, 'VIEW', { op: 'notice' });
+      const s = r.section.value;
+      const notices = (s.notices ?? []).filter((n) => n.accountId !== ctx.accountId);
+      if (notices.length === (s.notices ?? []).length) return { dismissed: true as const };
+      const next: SectionDoc = { ...s, notices, updatedAt: this.nowIso() };
+      await this.store.transact([this.putSection(r.section, next)]);
+      return { dismissed: true as const };
     });
   }
 

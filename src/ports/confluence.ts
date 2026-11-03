@@ -26,6 +26,12 @@ export interface GroupInfo {
   exists: boolean;
 }
 
+export interface PageRestrictionHit {
+  principalType: PrincipalType;
+  principalId: string;
+  operation: 'read' | 'update';
+}
+
 export interface GroupMembership {
   groupIds: string[];
   /** false when pagination cap was hit or the lookup failed: group grants may be missed (fail closed). */
@@ -46,6 +52,11 @@ export interface ConfluenceGateway {
   groups(groupIds: string[]): Promise<Map<string, GroupInfo>>;
   groupHasMembers(groupId: string): Promise<boolean>;
   isSiteAdmin(accountId: string): Promise<boolean>;
+  /**
+   * Page view/edit restrictions as the invoking user.
+   * Empty means the page is not restricted (or the caller cannot see a restriction list).
+   */
+  pageRestrictions(pageId: string): Promise<PageRestrictionHit[]>;
 }
 
 export interface PrivacyGateway {

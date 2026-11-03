@@ -122,6 +122,16 @@ const en = {
   'perm.conflict':
     'Permissions changed while you were editing. Reloaded the latest list; try again.',
   'perm.saved': 'Permissions updated.',
+  'perm.copy': 'Copy permissions from another section',
+  'perm.copy.ref': 'Section reference',
+  'perm.copy.action': 'Copy missing permissions',
+  'perm.seed': 'Use page restrictions',
+  'perm.seed.note':
+    'People and groups restricted on this page are added when they are not already listed. Existing access stays as it is.',
+  'perm.multiAdd': 'Add selected',
+  'notice.added':
+    '{name} gave you access ({role}). This note appears in the section only; it is not a Confluence notification.',
+  'notice.dismiss': 'Dismiss',
   'perm.groupDegraded':
     'Group membership could not be checked right now. Group access may be temporarily missing.',
   'perm.effective': 'Your access',
@@ -350,6 +360,16 @@ const es: Record<MessageKey, string> = {
   'perm.conflict':
     'Los permisos cambiaron mientras editabas. Se recargó la lista más reciente; inténtalo de nuevo.',
   'perm.saved': 'Permisos actualizados.',
+  'perm.copy': 'Copiar permisos de otra sección',
+  'perm.copy.ref': 'Referencia de la sección',
+  'perm.copy.action': 'Copiar los permisos que faltan',
+  'perm.seed': 'Usar las restricciones de la página',
+  'perm.seed.note':
+    'Las personas y los grupos restringidos en esta página se añaden si aún no están en la lista. El acceso existente se mantiene.',
+  'perm.multiAdd': 'Añadir seleccionados',
+  'notice.added':
+    '{name} te dio acceso ({role}). Este aviso solo aparece en la sección; no es una notificación de Confluence.',
+  'notice.dismiss': 'Descartar',
   'perm.groupDegraded':
     'No se pudo comprobar la pertenencia a grupos ahora. El acceso por grupo puede faltar temporalmente.',
   'perm.effective': 'Tu acceso',

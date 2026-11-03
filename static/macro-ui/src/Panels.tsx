@@ -122,6 +122,8 @@ export function PermissionsPanel({
   const [pendingRevoke, setPendingRevoke] = useState<{ type: PrincipalType; id: string } | null>(
     null,
   );
+  const [picked, setPicked] = useState<PrincipalHit[]>([]);
+  const [sourceRef, setSourceRef] = useState('');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [current, setCurrent] = useState<GrantList | null>(null);
   const list = current ?? grants.data;
@@ -132,7 +134,9 @@ export function PermissionsPanel({
         setCurrent(await run());
         setNotice({ kind: 'ok', text: t('perm.saved') });
         setHits([]);
+        setPicked([]);
         setQuery('');
+        setSourceRef('');
       } catch (e) {
         const err = e instanceof ApiError ? e : new ApiError('UNAVAILABLE');
         setNotice({ kind: 'err', text: errorText(err, t) });
@@ -405,21 +409,110 @@ export function PermissionsPanel({
         </button>
       </form>
       <ul className="ss-hits">
-        {hits.map((h) => (
-          <li key={`${h.principalType}:${h.principalId}`}>
-            {h.label}
-            <button
-              type="button"
-              className="ss-btn"
-              onClick={() =>
-                role === 'ADMINISTER' ? setPendingAdmin(h) : void upsert(h, role, expiresAtFor(ttl))
-              }
-            >
-              {t('action.add')}
-            </button>
-          </li>
-        ))}
+        {hits.map((h) => {
+          const key = `${h.principalType}:${h.principalId}`;
+          const on = picked.some((p) => `${p.principalType}:${p.principalId}` === key);
+          return (
+            <li key={key}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() =>
+                    setPicked((cur) =>
+                      on
+                        ? cur.filter((p) => `${p.principalType}:${p.principalId}` !== key)
+                        : [...cur, h],
+                    )
+                  }
+                />{' '}
+                {h.label}
+              </label>
+              <button
+                type="button"
+                className="ss-btn"
+                onClick={() =>
+                  role === 'ADMINISTER'
+                    ? setPendingAdmin(h)
+                    : void upsert(h, role, expiresAtFor(ttl))
+                }
+              >
+                {t('action.add')}
+              </button>
+            </li>
+          );
+        })}
       </ul>
+      {picked.length > 0 && role !== 'ADMINISTER' && (
+        <button
+          type="button"
+          className="ss-btn ss-primary"
+          onClick={() =>
+            apply(async () => {
+              let version = list.aclVersion;
+              let last = list;
+              const expiresAt = expiresAtFor(ttl);
+              for (const h of picked) {
+                last = unwrap(
+                  await api.call('upsertGrant', {
+                    principalType: h.principalType,
+                    principalId: h.principalId,
+                    role,
+                    expectedAclVersion: version,
+                    expiresAt,
+                  }),
+                );
+                version = last.aclVersion;
+              }
+              return last;
+            })
+          }
+        >
+          {t('perm.multiAdd')} ({picked.length})
+        </button>
+      )}
+      <h3>{t('perm.copy')}</h3>
+      <form
+        className="ss-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void apply(async () =>
+            unwrap(
+              await api.call('copyGrants', {
+                sourceRef: sourceRef.trim(),
+                expectedAclVersion: list.aclVersion,
+              }),
+            ),
+          );
+        }}
+      >
+        <label>
+          {t('perm.copy.ref')}
+          <input
+            value={sourceRef}
+            maxLength={64}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setSourceRef(e.target.value)}
+          />
+        </label>
+        <button type="submit" className="ss-btn" disabled={sourceRef.trim() === ''}>
+          {t('perm.copy.action')}
+        </button>
+      </form>
+      <h3>{t('perm.seed')}</h3>
+      <p className="ss-muted">{t('perm.seed.note')}</p>
+      <button
+        type="button"
+        className="ss-btn"
+        onClick={() =>
+          void apply(async () =>
+            unwrap(await api.call('seedPageRestrictions', { expectedAclVersion: list.aclVersion })),
+          )
+        }
+      >
+        {t('perm.seed')}
+      </button>
     </Panel>
   );
 }

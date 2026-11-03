@@ -5,6 +5,7 @@ import {
   type GroupInfo,
   type GroupMembership,
   type PagePermissions,
+  type PageRestrictionHit,
   type PrivacyGateway,
   type UserInfo,
 } from '../ports/confluence';
@@ -16,6 +17,7 @@ import {
  */
 export class FakeConfluence implements ConfluenceGateway {
   private pages = new Map<string, Map<string, PagePermissions>>();
+  private restrictions = new Map<string, PageRestrictionHit[]>();
   private userDir = new Map<string, UserInfo>();
   private groupDir = new Map<string, { info: GroupInfo; members: Set<string> }>();
   siteAdmins = new Set<string>();
@@ -51,6 +53,11 @@ export class FakeConfluence implements ConfluenceGateway {
   deactivate(accountId: string): this {
     const u = this.userDir.get(accountId);
     if (u) this.userDir.set(accountId, { ...u, active: false });
+    return this;
+  }
+
+  setRestrictions(pageId: string, hits: PageRestrictionHit[]): this {
+    this.restrictions.set(pageId, hits);
     return this;
   }
 
@@ -120,6 +127,12 @@ export class FakeConfluence implements ConfluenceGateway {
   async groupHasMembers(groupId: string): Promise<boolean> {
     this.maybeFail('groupHasMembers');
     return (this.groupDir.get(groupId)?.members.size ?? 0) > 0;
+  }
+
+  async pageRestrictions(pageId: string): Promise<PageRestrictionHit[]> {
+    await Promise.resolve();
+    this.maybeFail('pageRestrictions');
+    return this.restrictions.get(pageId) ?? [];
   }
 
   async isSiteAdmin(accountId: string): Promise<boolean> {

@@ -34,6 +34,9 @@ export const RESOLVER_FUNCTIONS = [
   'cancelAccessRequest',
   'listAccessRequests',
   'resolveAccessRequest',
+  'copyGrants',
+  'seedPageRestrictions',
+  'dismissNotice',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -148,7 +151,15 @@ export type SectionView =
       content: ContentPayload;
       aclVersion: number;
       meta: SectionMeta;
+      /** In-app note that this caller was granted access. Null when there is nothing to show. */
+      notice: GrantNotice | null;
     };
+
+export interface GrantNotice {
+  role: Role;
+  addedByName: string;
+  at: string;
+}
 
 export interface EffectiveAccess {
   role: Role | null;
@@ -323,6 +334,15 @@ export interface RequestMap {
     req: { title: string | null; classification: Classification | null };
     res: Result<SectionMeta>;
   };
+  copyGrants: {
+    req: { sourceRef: string; expectedAclVersion: number };
+    res: Result<GrantList>;
+  };
+  seedPageRestrictions: {
+    req: { expectedAclVersion: number };
+    res: Result<GrantList>;
+  };
+  dismissNotice: { req: Record<string, never>; res: Result<{ dismissed: true }> };
 }
 
 export type RequestOf<K extends ResolverFunction> = RequestMap[K]['req'];

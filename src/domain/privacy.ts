@@ -172,8 +172,13 @@ export class PrivacyService {
       addedBy: g.addedBy === accountId ? pseudonym : g.addedBy,
     }));
     const requests = (s.requests ?? []).filter((r) => r.accountId !== accountId);
+    const notices = (s.notices ?? [])
+      .filter((n) => n.accountId !== accountId)
+      .map((n) => (n.addedBy === accountId ? { ...n, addedBy: pseudonym } : n));
     const touched =
       requests.length !== (s.requests ?? []).length ||
+      notices.length !== (s.notices ?? []).length ||
+      (s.notices ?? []).some((n, i) => n.addedBy !== notices[i]?.addedBy) ||
       s.ownerAccountId === accountId ||
       s.createdBy === accountId ||
       grants.length !== s.grants.length ||
@@ -190,6 +195,7 @@ export class PrivacyService {
         ...s,
         grants,
         ...(s.requests ? { requests } : {}),
+        ...(s.notices ? { notices } : {}),
         ownerAccountId: s.ownerAccountId === accountId ? owner : s.ownerAccountId,
         createdBy: s.createdBy === accountId ? pseudonym : s.createdBy,
         aclVersion: s.aclVersion + 1,

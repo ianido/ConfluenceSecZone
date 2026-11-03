@@ -337,6 +337,25 @@ function Ready({
 
   return (
     <div className="ss-shell">
+      {view.notice && (
+        <div className="ss-callout" role="status">
+          <p>
+            {t('notice.added', {
+              name: view.notice.addedByName,
+              role: t(`role.${view.notice.role}`),
+            })}
+          </p>
+          <button
+            type="button"
+            className="ss-btn"
+            onClick={() => {
+              void safeCall(api, 'dismissNotice', {}).then(() => reload());
+            }}
+          >
+            {t('notice.dismiss')}
+          </button>
+        </div>
+      )}
       <SectionHeader
         api={api}
         meta={meta}

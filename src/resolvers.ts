@@ -142,6 +142,13 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     updateMetadata: guarded('updateMetadata', (ctx, p) =>
       service.updateMetadata(ctx, { title: p.title, classification: p.classification }),
     ),
+    copyGrants: guarded('copyGrants', (ctx, p) =>
+      service.copyGrants(ctx, p.sourceRef, p.expectedAclVersion),
+    ),
+    seedPageRestrictions: guarded('seedPageRestrictions', (ctx, p) =>
+      service.seedPageRestrictions(ctx, p.expectedAclVersion),
+    ),
+    dismissNotice: guarded('dismissNotice', (ctx) => service.dismissNotice(ctx)),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,
