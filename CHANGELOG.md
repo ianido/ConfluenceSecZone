@@ -22,6 +22,7 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 - A section with content opens locked for every reader, including an administrator. Unlock reveals it.
 - Site settings use the mockup layout: side navigation, policy toggles, retention, classification badges, diagnostics and recovery.
 - Mockup chrome on every screen: lock and gear icons, colored classification and status pills, initials avatars, template marks, a repeating watermark, and green/red lines in the history diff.
+- My sections no longer fails when the storage query asks for more than 100 rows. Forge rejects that page size, and the screen was showing the generic error.
 - Scopes `read:content.restriction:confluence` (read the page's restrictions in order to seed an ACL) and `read:page:confluence` (tell a deleted page from a page you cannot see). Installing this build needs an administrator to accept them again.
 - Forge macro `secure-section-macro` with Custom UI (React 19, Tiptap 3), resolver, `adfExport` placeholder and daily maintenance trigger.
 - Domain: binding protocol, ACL with VIEW/MODIFY/ADMINISTER, final-administrator rule, revisions, hash-chained audit, retention, privacy anonymisation, site-admin recovery.

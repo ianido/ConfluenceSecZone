@@ -13,6 +13,9 @@ import {
 export const ENTITY = 'ssdoc';
 export const INDEX = 'by-partition';
 
+/** Custom Entity queries reject a page size outside 1..100 (COMPLEX_QUERY_PAGE_LIMIT_NOT_IN_RANGE). */
+const QUERY_PAGE_MAX = 100;
+
 interface Stored {
   rev: number;
   p: string;
@@ -63,28 +66,56 @@ export class KvsStore implements Store {
 
   async list<T>(q: ListQuery): Promise<ListResult<T>> {
     try {
-      let builder = kvs
-        .entity<Stored>(ENTITY)
-        .query()
-        .index(INDEX, { partition: [`${q.entity}|${q.partition}`] });
-      if (q.rangeBeginsWith !== undefined) {
-        builder = builder.where(WhereConditions.beginsWith(q.rangeBeginsWith));
+      const items: ListResult<T>['items'] = [];
+      let cursor = q.cursor;
+      let nextCursor: string | null = null;
+      while (items.length < q.limit) {
+        const pageLimit = Math.min(QUERY_PAGE_MAX, q.limit - items.length);
+        const page = await this.queryPage<T>(q, pageLimit, cursor);
+        items.push(...page.items);
+        nextCursor = page.nextCursor;
+        if (!page.nextCursor || page.items.length === 0) break;
+        cursor = page.nextCursor;
       }
-      builder = builder.sort(q.order === 'ASC' ? Sort.ASC : Sort.DESC).limit(q.limit);
-      if (q.cursor) builder = builder.cursor(q.cursor);
-      const res = await builder.getMany();
-      return {
-        items: res.results.map((r) => ({
-          entity: q.entity,
-          key: stripPrefix(r.key, q.entity),
-          rev: r.value.rev,
-          value: r.value.payload as T,
-        })),
-        nextCursor: res.nextCursor ?? null,
-      };
+      return { items, nextCursor: items.length >= q.limit ? nextCursor : null };
     } catch (e) {
+      if (e instanceof ForgeKvsAPIError) {
+        console.error(
+          JSON.stringify({
+            event: 'kvs.list.failure',
+            status: e.responseDetails.status,
+            code: e.code,
+          }),
+        );
+      }
       throw mapError(e);
     }
+  }
+
+  private async queryPage<T>(
+    q: ListQuery,
+    limit: number,
+    cursor: string | null | undefined,
+  ): Promise<ListResult<T>> {
+    let builder = kvs
+      .entity<Stored>(ENTITY)
+      .query()
+      .index(INDEX, { partition: [`${q.entity}|${q.partition}`] });
+    if (q.rangeBeginsWith !== undefined) {
+      builder = builder.where(WhereConditions.beginsWith(q.rangeBeginsWith));
+    }
+    builder = builder.sort(q.order === 'ASC' ? Sort.ASC : Sort.DESC).limit(limit);
+    if (cursor) builder = builder.cursor(cursor);
+    const res = await builder.getMany();
+    return {
+      items: res.results.map((r) => ({
+        entity: q.entity,
+        key: stripPrefix(r.key, q.entity),
+        rev: r.value.rev,
+        value: r.value.payload as T,
+      })),
+      nextCursor: res.nextCursor ?? null,
+    };
   }
 
   async transact(ops: TxOp[]): Promise<void> {
