@@ -39,6 +39,9 @@ export const RESOLVER_FUNCTIONS = [
   'dismissNotice',
   'setRevisionTag',
   'revealSecret',
+  'listMySections',
+  'exportMyAudit',
+  'deleteOrphan',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -283,6 +286,39 @@ export interface SitePolicy {
   classes: ClassPolicy[];
 }
 
+export type PageStatus = 'OK' | 'MISSING' | 'UNKNOWN';
+
+export interface MySectionRow {
+  sectionId: string;
+  title: string | null;
+  classification: Classification | null;
+  pageId: string;
+  spaceKey: string | null;
+  pageStatus: PageStatus;
+  role: Role;
+  sharedUsers: number;
+  updatedAt: string;
+}
+
+export interface MySections {
+  rows: MySectionRow[];
+  truncated: boolean;
+  kpis: {
+    administered: number;
+    pendingRequests: number;
+    expiringGrants: number;
+    inactive: number;
+  };
+  /** Recent audit metadata only. Never content, reasons or document text. */
+  activity: Array<{ at: string; action: string; actor: string; title: string | null }>;
+}
+
+export interface AuditExport {
+  csv: string;
+  rows: number;
+  truncated: boolean;
+}
+
 export interface ProtectionFlags {
   watermark: boolean;
   autoLockMinutes: number | null;
@@ -386,6 +422,12 @@ export interface RequestMap {
   revealSecret: {
     req: { label?: string | null };
     res: Result<{ recorded: true }>;
+  };
+  listMySections: { req: Record<string, never>; res: Result<MySections> };
+  exportMyAudit: { req: Record<string, never>; res: Result<AuditExport> };
+  deleteOrphan: {
+    req: { sectionId: string; confirm: 'DELETE' };
+    res: Result<{ deleted: true }>;
   };
 }
 

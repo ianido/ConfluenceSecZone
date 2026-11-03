@@ -57,6 +57,13 @@ export interface ConfluenceGateway {
    * Empty means the page is not restricted (or the caller cannot see a restriction list).
    */
   pageRestrictions(pageId: string): Promise<PageRestrictionHit[]>;
+  /**
+   * Whether the page still exists, as the invoking user.
+   * MISSING is a 404. UNKNOWN is a 403 or an ambiguous response: do not treat it as deleted.
+   */
+  pageSummary(
+    pageId: string,
+  ): Promise<{ status: 'OK' | 'MISSING' | 'UNKNOWN'; title: string | null }>;
 }
 
 export interface PrivacyGateway {

@@ -181,6 +181,20 @@ export class ForgeConfluenceGateway implements ConfluenceGateway {
     return Array.isArray(j.results) && j.results.length > 0;
   }
 
+  async pageSummary(
+    pageId: string,
+  ): Promise<{ status: 'OK' | 'MISSING' | 'UNKNOWN'; title: string | null }> {
+    if (!PAGE_ID_RE.test(pageId)) return { status: 'UNKNOWN', title: null };
+    const res = await api.asUser().requestConfluence(route`/wiki/api/v2/pages/${pageId}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.status === 404) return { status: 'MISSING', title: null };
+    if (res.status === 403) return { status: 'UNKNOWN', title: null };
+    if (!res.ok) fail(res);
+    const j = await readJson(res);
+    return { status: 'OK', title: typeof j.title === 'string' ? j.title : null };
+  }
+
   async pageRestrictions(pageId: string): Promise<PageRestrictionHit[]> {
     if (!PAGE_ID_RE.test(pageId)) return [];
     const res = await api

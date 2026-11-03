@@ -38,6 +38,13 @@ modules:
         function: resolver
       adfExport:
         function: adf-export
+  confluence:globalPage:
+    - key: secure-sections-home
+      resource: macro-ui
+      resolver:
+        function: resolver
+      title: My secure sections
+      route: secure-sections
   scheduledTrigger:
     - key: maintenance-daily
       function: maintenance
@@ -63,3 +70,4 @@ permissions:
     - read:confluence-groups
     - read:content-details:confluence
     - read:content.restriction:confluence
+    - read:page:confluence

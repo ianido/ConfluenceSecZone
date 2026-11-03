@@ -58,3 +58,59 @@ export function parseResolverContext(raw: unknown): TrustedContext | null {
     locale: str(c.locale) ?? 'en',
   };
 }
+
+/**
+ * Identity for site-level modules (global page, settings) that have no macro content id.
+ * A page id is captured when the module is rendered on a page (byline) and ignored otherwise.
+ */
+export interface SiteContext {
+  accountId: string;
+  cloudId: string;
+  moduleKey: string;
+  environmentId: string;
+  locale: string;
+  pageId: string | null;
+  localId: string | null;
+  spaceKey: string | null;
+}
+
+export function parseSiteContext(raw: unknown): SiteContext | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const c = raw as Record<string, unknown>;
+  const accountId = str(c.accountId);
+  const cloudId = str(c.cloudId);
+  const moduleKey = str(c.moduleKey);
+  const environmentId = str(c.environmentId);
+  if (!accountId || !cloudId || !moduleKey || !environmentId) return null;
+  if (!ACCOUNT_ID_RE.test(accountId)) return null;
+  const localRaw = str(c.localId);
+  const localId = localRaw && LOCAL_ID_RE.test(localRaw) ? localRaw : null;
+  let pageId: string | null = null;
+  let spaceKey: string | null = null;
+  const ext = c.extension;
+  if (typeof ext === 'object' && ext !== null) {
+    const e = ext as Record<string, unknown>;
+    const content = e.content;
+    const contentId =
+      typeof content === 'object' && content !== null
+        ? (content as Record<string, unknown>).id
+        : undefined;
+    const candidate =
+      typeof contentId === 'string' || typeof contentId === 'number' ? String(contentId) : null;
+    if (candidate && PAGE_ID_RE.test(candidate)) pageId = candidate;
+    const space = e.space;
+    if (typeof space === 'object' && space !== null) {
+      spaceKey = str((space as Record<string, unknown>).key);
+    }
+  }
+  return {
+    accountId,
+    cloudId,
+    moduleKey,
+    environmentId,
+    locale: str(c.locale) ?? 'en',
+    pageId,
+    localId,
+    spaceKey,
+  };
+}

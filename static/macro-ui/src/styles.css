@@ -161,6 +161,16 @@ summary:focus-visible {
   padding: 16px;
   background: var(--ss-bg);
 }
+.ss-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .ss-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
 .ss-reading {
   position: relative;
 }

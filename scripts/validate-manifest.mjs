@@ -35,6 +35,7 @@ const allowed = new Set([
   'read:confluence-groups',
   'read:content-details:confluence',
   'read:content.restriction:confluence',
+  'read:page:confluence',
 ]);
 for (const s of scopes)
   if (!allowed.has(s))

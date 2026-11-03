@@ -6,7 +6,12 @@ import {
   type ResponseOf,
   type SectionView,
 } from '@secure-sections/shared';
-import { parseResolverContext, type TrustedContext } from './domain/context';
+import {
+  parseResolverContext,
+  parseSiteContext,
+  type SiteContext,
+  type TrustedContext,
+} from './domain/context';
 import { DomainError } from './domain/errors';
 import { CorruptedContentError, type SecureSectionService } from './domain/service';
 import { GatewayError } from './ports/confluence';
@@ -64,6 +69,21 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     ): Handler<K> =>
     async (req) => {
       const ctx = parseResolverContext(req.context);
+      if (!ctx) return { ok: false, code: 'UNAVAILABLE' } as ResponseOf<K>;
+      try {
+        return { ok: true, data: await run(ctx, payloadOf(req)) } as ResponseOf<K>;
+      } catch (e) {
+        return toFailure(e, fn, logger) as ResponseOf<K>;
+      }
+    };
+
+  const guardedSite =
+    <K extends 'listMySections' | 'exportMyAudit' | 'deleteOrphan'>(
+      fn: K,
+      run: (ctx: SiteContext, p: Record<string, unknown>) => Promise<unknown>,
+    ): Handler<K> =>
+    async (req) => {
+      const ctx = parseSiteContext(req.context);
       if (!ctx) return { ok: false, code: 'UNAVAILABLE' } as ResponseOf<K>;
       try {
         return { ok: true, data: await run(ctx, payloadOf(req)) } as ResponseOf<K>;
@@ -153,6 +173,11 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
       service.setRevisionTag(ctx, p.version, p.tag),
     ),
     revealSecret: guarded('revealSecret', (ctx, p) => service.revealSecret(ctx, p.label)),
+    listMySections: guardedSite('listMySections', (ctx) => service.listMySections(ctx)),
+    exportMyAudit: guardedSite('exportMyAudit', (ctx) => service.exportMyAudit(ctx)),
+    deleteOrphan: guardedSite('deleteOrphan', (ctx, p) =>
+      service.deleteOrphan(ctx, p.sectionId, p.confirm),
+    ),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,

@@ -3,6 +3,7 @@ import {
   REVISION_TAG_MAX_LENGTH,
   EMPTY_DOC,
   REQUEST_REASON_MAX_LENGTH,
+  maxRole,
   roleAtLeast,
   safeValidateDoc,
   validateDoc,
@@ -29,6 +30,8 @@ import {
   type SectionView,
   type GrantNotice,
   type ProtectionFlags,
+  type AuditExport,
+  type MySections,
   type SitePolicy,
   type UserSummary,
   type AuditAction,
@@ -50,7 +53,7 @@ import {
 } from '../ports/store';
 import { buildChainedAudit, buildUnchainedAudit, sha256, verifyChain } from './audit';
 import { AuthorizationService, type BoundResolved, type Resolved } from './authz';
-import type { TrustedContext } from './context';
+import type { SiteContext, TrustedContext } from './context';
 import { DomainError } from './errors';
 import {
   ACCOUNT_ID_RE,
@@ -1760,6 +1763,184 @@ export class SecureSectionService {
     }
     return false;
   }
+
+  // ---------------------------------------------------------------- site home
+
+  private directRole(
+    s: SectionDoc,
+    accountId: string,
+    groupIds: Set<string>,
+    now: number,
+  ): Role | null {
+    const roles: Role[] = [];
+    for (const g of s.grants) {
+      if (g.expiresAt && Date.parse(g.expiresAt) <= now) continue;
+      if (g.principalType === 'USER' && g.principalId === accountId) roles.push(g.role);
+      if (g.principalType === 'GROUP' && groupIds.has(g.principalId)) roles.push(g.role);
+    }
+    return maxRole(roles);
+  }
+
+  private async visibleSections(
+    ctx: SiteContext,
+  ): Promise<Array<{ section: Doc<SectionDoc>; role: Role }>> {
+    let groupIds = new Set<string>();
+    try {
+      const membership = await this.gateway.groupMembership(ctx.accountId);
+      if (membership.complete) groupIds = new Set(membership.groupIds);
+    } catch (e) {
+      if (!(e instanceof GatewayError)) throw e;
+    }
+    const listed = await this.store.list<SectionDoc>({
+      entity: 'section',
+      partition: 'all',
+      order: 'ASC',
+      limit: 200,
+    });
+    const now = this.clock.now().getTime();
+    const out: Array<{ section: Doc<SectionDoc>; role: Role }> = [];
+    for (const item of listed.items) {
+      const s = item.value;
+      if (s.cloudId !== ctx.cloudId || s.status !== 'ACTIVE') continue;
+      const role = this.directRole(s, ctx.accountId, groupIds, now);
+      if (role) out.push({ section: item, role });
+    }
+    return out;
+  }
+
+  async listMySections(ctx: SiteContext): Promise<MySections> {
+    const visible = await this.visibleSections(ctx);
+    const now = this.clock.now().getTime();
+    const rows: MySections['rows'] = [];
+    const activity: MySections['activity'] = [];
+    let administered = 0;
+    let pendingRequests = 0;
+    let expiringGrants = 0;
+    let inactive = 0;
+    for (const { section, role } of visible) {
+      const s = section.value;
+      let pageStatus: MySections['rows'][number]['pageStatus'] = 'UNKNOWN';
+      try {
+        pageStatus = (await this.gateway.pageSummary(s.primaryPageId)).status;
+      } catch (e) {
+        if (!(e instanceof GatewayError)) throw e;
+      }
+      if (role === 'ADMINISTER') {
+        administered += 1;
+        pendingRequests += this.liveRequests(s).length;
+        expiringGrants += s.grants.filter((g) => {
+          if (!g.expiresAt) return false;
+          const t = Date.parse(g.expiresAt);
+          return t > now && t - now <= 7 * 86_400_000;
+        }).length;
+      }
+      if (now - Date.parse(s.updatedAt) > 90 * 86_400_000) inactive += 1;
+      rows.push({
+        sectionId: s.sectionId,
+        title: s.title ?? null,
+        classification: s.classification ?? null,
+        pageId: s.primaryPageId,
+        spaceKey: s.spaceKey,
+        pageStatus,
+        role,
+        sharedUsers: s.grants.filter((g) => g.principalType === 'USER').length,
+        updatedAt: s.updatedAt,
+      });
+      const audits = await this.store.list<AuditDoc>({
+        entity: 'audit',
+        partition: s.sectionId,
+        order: 'DESC',
+        limit: 5,
+      });
+      for (const a of audits.items) {
+        if (a.value.erased) continue;
+        activity.push({
+          at: a.value.at,
+          action: a.value.action,
+          actor: a.value.actor,
+          title: s.title ?? null,
+        });
+      }
+    }
+    rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    activity.sort((a, b) => (a.at < b.at ? 1 : -1));
+    const listed = await this.store.list<SectionDoc>({
+      entity: 'section',
+      partition: 'all',
+      order: 'ASC',
+      limit: 200,
+    });
+    return {
+      rows,
+      truncated: listed.nextCursor !== null,
+      kpis: { administered, pendingRequests, expiringGrants, inactive },
+      activity: activity.slice(0, 20),
+    };
+  }
+
+  async exportMyAudit(ctx: SiteContext): Promise<AuditExport> {
+    const visible = await this.visibleSections(ctx);
+    const lines = ['at,action,actor,section'];
+    let rows = 0;
+    let truncated = false;
+    for (const { section } of visible) {
+      const s = section.value;
+      const audits = await this.store.list<AuditDoc>({
+        entity: 'audit',
+        partition: s.sectionId,
+        order: 'DESC',
+        limit: 100,
+      });
+      for (const a of audits.items) {
+        if (rows >= 500) {
+          truncated = true;
+          break;
+        }
+        if (a.value.erased) continue;
+        const title = s.title ?? '';
+        lines.push([a.value.at, a.value.action, a.value.actor, title].map(csvCell).join(','));
+        rows += 1;
+      }
+      if (truncated) break;
+    }
+    return { csv: lines.join('\n'), rows, truncated };
+  }
+
+  async deleteOrphan(
+    ctx: SiteContext,
+    sectionId: unknown,
+    confirm: unknown,
+  ): Promise<{ deleted: true }> {
+    if (confirm !== 'DELETE') throw new DomainError('INVALID_REQUEST');
+    if (typeof sectionId !== 'string' || !UUID_RE.test(sectionId)) throw new DomainError('DENIED');
+    return this.withRetry(async () => {
+      const found = await this.authz.resolveByRef(
+        { ...ctx, pageId: ctx.pageId ?? '0', localId: ctx.localId ?? 'site' } as TrustedContext,
+        sectionId,
+      );
+      if (!found || !roleAtLeast(found.role.role, 'ADMINISTER')) throw new DomainError('DENIED');
+      const s = found.section.value;
+      let status: 'OK' | 'MISSING' | 'UNKNOWN' = 'UNKNOWN';
+      try {
+        status = (await this.gateway.pageSummary(s.primaryPageId)).status;
+      } catch (e) {
+        if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
+        throw e;
+      }
+      if (status !== 'MISSING') throw new DomainError('DENIED');
+      const now = this.nowIso();
+      const next: SectionDoc = { ...s, status: 'DELETED', deletedAt: now, updatedAt: now };
+      const { audit, op } = this.chain(s, 'SECTION_DELETE', ctx.accountId, { orphan: true });
+      next.auditHead = audit.hash;
+      await this.store.transact([this.putSection(found.section, next), op]);
+      return { deleted: true as const };
+    });
+  }
+}
+
+function csvCell(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replaceAll('"', '""')}"`;
+  return value;
 }
 
 export { validateDoc };
