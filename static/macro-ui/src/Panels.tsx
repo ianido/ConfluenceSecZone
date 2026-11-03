@@ -11,6 +11,7 @@ import {
   type RichDoc,
   type Role,
 } from '@secure-sections/shared';
+import { RequestsQueue } from './Access';
 import { ApiError, safeCall, unwrap, type Api } from './api';
 import { useT } from './i18n';
 import { RichRenderer } from './Renderer';
@@ -100,7 +101,13 @@ export function RoleLabel({ role }: { role: Role | null }) {
 
 // ------------------------------------------------------------------ Permissions
 
-export function PermissionsPanel({ api }: { api: Api }) {
+export function PermissionsPanel({
+  api,
+  onPending,
+}: {
+  api: Api;
+  onPending?: (n: number) => void;
+}) {
   const t = useT();
   const grants = useLoad(async () => unwrap(await api.call('listGrants', {})));
   const access = useLoad(async () => unwrap(await api.call('getEffectiveAccess', {})));
@@ -166,6 +173,15 @@ export function PermissionsPanel({ api }: { api: Api }) {
     <Panel title={t('perm.title')}>
       <p className="ss-muted">{t('perm.explain')}</p>
       {access.data && <EffectiveBox access={access.data} />}
+      <RequestsQueue
+        api={api}
+        aclVersion={list.aclVersion}
+        {...(onPending ? { onCount: onPending } : {})}
+        onResolved={() => {
+          setCurrent(null);
+          grants.reload();
+        }}
+      />
       <div role="status" aria-live="polite">
         {notice && <p className={notice.kind === 'ok' ? 'ss-ok' : 'ss-err'}>{notice.text}</p>}
       </div>

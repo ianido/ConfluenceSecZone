@@ -122,6 +122,20 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     copyHere: guarded('copyHere', (ctx, p) => service.copyHere(ctx, p.sourceRef)),
     deleteSection: guarded('deleteSection', (ctx, p) => service.deleteSection(ctx, p.confirm)),
     getDiagnostics: guarded('getDiagnostics', (ctx) => service.getDiagnostics(ctx)),
+    getAccessInfo: guarded('getAccessInfo', (ctx) => service.getAccessInfo(ctx)),
+    requestAccess: guarded('requestAccess', (ctx, p) =>
+      service.requestAccess(ctx, { role: p.role, reason: p.reason }),
+    ),
+    cancelAccessRequest: guarded('cancelAccessRequest', (ctx) => service.cancelAccessRequest(ctx)),
+    listAccessRequests: guarded('listAccessRequests', (ctx) => service.listAccessRequests(ctx)),
+    resolveAccessRequest: guarded('resolveAccessRequest', (ctx, p) =>
+      service.resolveAccessRequest(ctx, {
+        accountId: p.accountId,
+        decision: p.decision,
+        role: p.role,
+        expectedAclVersion: p.expectedAclVersion,
+      }),
+    ),
     updateMetadata: guarded('updateMetadata', (ctx, p) =>
       service.updateMetadata(ctx, { title: p.title, classification: p.classification }),
     ),

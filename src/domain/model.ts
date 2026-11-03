@@ -18,7 +18,11 @@ export const LIMITS = {
   revisionPageSize: 25,
   principalSearchLimit: 20,
   maxGroupPages: 10,
+  maxPendingRequests: 50,
+  maxAdminNamesShown: 5,
 } as const;
+
+export const REQUEST_TTL_DAYS = 30;
 
 export const DEFAULT_RETENTION: RetentionConfig = {
   revisionsKeep: 50,
@@ -33,6 +37,13 @@ export interface GrantRec {
   role: Role;
   addedAt: string;
   addedBy: string;
+}
+
+export interface AccessRequestRec {
+  accountId: string;
+  role: 'VIEW' | 'MODIFY';
+  reason: string;
+  requestedAt: string;
 }
 
 export interface BindingRef {
@@ -60,6 +71,8 @@ export interface SectionDoc {
   /** Optional descriptive metadata; absent on sections created before it existed. */
   title?: string | null;
   classification?: Classification | null;
+  /** Pending access requests, bounded by LIMITS.maxPendingRequests and REQUEST_TTL_DAYS. */
+  requests?: AccessRequestRec[];
 }
 
 export interface BindingDoc {

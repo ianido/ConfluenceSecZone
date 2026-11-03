@@ -51,6 +51,7 @@ export class PrivacyService {
       if (g.principalType === 'USER') ids.add(g.principalId);
       ids.add(g.addedBy);
     }
+    for (const r of s.requests ?? []) ids.add(r.accountId);
     const audits = await this.store.list<AuditDoc>({
       entity: 'audit',
       partition: s.sectionId,
@@ -170,7 +171,9 @@ export class PrivacyService {
           : g.principalId,
       addedBy: g.addedBy === accountId ? pseudonym : g.addedBy,
     }));
+    const requests = (s.requests ?? []).filter((r) => r.accountId !== accountId);
     const touched =
+      requests.length !== (s.requests ?? []).length ||
       s.ownerAccountId === accountId ||
       s.createdBy === accountId ||
       grants.length !== s.grants.length ||
@@ -186,6 +189,7 @@ export class PrivacyService {
       const next: SectionDoc = {
         ...s,
         grants,
+        ...(s.requests ? { requests } : {}),
         ownerAccountId: s.ownerAccountId === accountId ? owner : s.ownerAccountId,
         createdBy: s.createdBy === accountId ? pseudonym : s.createdBy,
         aclVersion: s.aclVersion + 1,

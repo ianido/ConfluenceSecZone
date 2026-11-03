@@ -43,6 +43,15 @@ describe('resolver surface: every function denies unauthorised callers and leaks
     bindHere: { sectionRef: 'x' },
     copyHere: { sourceRef: 'x' },
     updateMetadata: { title: 'hijack', classification: 'RESTRICTED' },
+    getAccessInfo: {},
+    requestAccess: { role: 'VIEW', reason: 'please' },
+    cancelAccessRequest: {},
+    listAccessRequests: {},
+    resolveAccessRequest: {
+      accountId: 'mallory',
+      decision: 'APPROVE',
+      expectedAclVersion: 1,
+    },
   };
 
   for (const fn of RESOLVER_FUNCTIONS.filter((f) => f !== 'createSection')) {
@@ -53,6 +62,10 @@ describe('resolver surface: every function denies unauthorised callers and leaks
       if (fn === 'getEffectiveAccess') {
         // Reporting "no role" for the caller's own identity reveals nothing beyond the denied card.
         expect(res).toMatchObject({ ok: true, data: { role: null, sources: [] } });
+      } else if (fn === 'getAccessInfo' || fn === 'requestAccess' || fn === 'cancelAccessRequest') {
+        // Public metadata and the caller's own request. Title/classification are not secret.
+        expect(res).toMatchObject({ ok: true });
+        expect(JSON.stringify(res)).not.toMatch(/GRANT_|CONTENT_|bodyJson/);
       } else if (fn !== 'getSection') expect(res).toMatchObject({ ok: false });
       else expect(res).toEqual({ state: 'DENIED' });
     });

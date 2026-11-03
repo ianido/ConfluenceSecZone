@@ -29,6 +29,11 @@ export const RESOLVER_FUNCTIONS = [
   'getDiagnostics',
   'recoverSection',
   'updateMetadata',
+  'getAccessInfo',
+  'requestAccess',
+  'cancelAccessRequest',
+  'listAccessRequests',
+  'resolveAccessRequest',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -87,6 +92,47 @@ export interface SectionMeta {
   title: string | null;
   classification: Classification | null;
   sharedWith: { users: number; groups: number };
+}
+
+export const REQUESTABLE_ROLES = ['VIEW', 'MODIFY'] as const;
+export type RequestableRole = (typeof REQUESTABLE_ROLES)[number];
+
+export function isRequestableRole(value: unknown): value is RequestableRole {
+  return typeof value === 'string' && (REQUESTABLE_ROLES as readonly string[]).includes(value);
+}
+
+export const REQUEST_REASON_MAX_LENGTH = 280;
+
+export interface MyAccessRequest {
+  role: RequestableRole;
+  reason: string;
+  requestedAt: string;
+}
+
+/**
+ * What a page viewer WITHOUT access may learn about a section: the public title and
+ * classification, up to a few administrator names (so they know whom to ask) and their own
+ * pending request. Never content, grants, or counts.
+ */
+export interface AccessInfo {
+  title: string | null;
+  classification: Classification | null;
+  administrators: UserSummary[];
+  myRequest: MyAccessRequest | null;
+}
+
+export interface AccessRequestItem {
+  accountId: string;
+  displayName: string;
+  active: boolean;
+  role: RequestableRole;
+  reason: string;
+  requestedAt: string;
+}
+
+export interface AccessRequestList {
+  requests: AccessRequestItem[];
+  aclVersion: number;
 }
 
 export type SectionView =
@@ -159,6 +205,10 @@ export type AuditAction =
   | 'SECTION_DELETE'
   | 'ADMIN_RECOVERY'
   | 'METADATA_UPDATE'
+  | 'ACCESS_REQUEST'
+  | 'ACCESS_REQUEST_CANCEL'
+  | 'ACCESS_REQUEST_APPROVE'
+  | 'ACCESS_REQUEST_REJECT'
   | 'ACCESS_DENIED'
   | 'RETENTION_PURGE';
 
@@ -242,6 +292,22 @@ export interface RequestMap {
   recoverSection: {
     req: { newAdministratorAccountId: string; confirm: string };
     res: Result<{ recovered: true }>;
+  };
+  getAccessInfo: { req: Record<string, never>; res: Result<AccessInfo> };
+  requestAccess: {
+    req: { role: RequestableRole; reason?: string };
+    res: Result<AccessInfo>;
+  };
+  cancelAccessRequest: { req: Record<string, never>; res: Result<AccessInfo> };
+  listAccessRequests: { req: Record<string, never>; res: Result<AccessRequestList> };
+  resolveAccessRequest: {
+    req: {
+      accountId: string;
+      decision: 'APPROVE' | 'REJECT';
+      role?: RequestableRole;
+      expectedAclVersion: number;
+    };
+    res: Result<AccessRequestList>;
   };
   updateMetadata: {
     req: { title: string | null; classification: Classification | null };

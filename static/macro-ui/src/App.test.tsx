@@ -24,11 +24,67 @@ describe('App states', () => {
   });
 
   it('denied: shows no content and offers actionable guidance', async () => {
-    const api = scriptedApi({ getSection: () => ({ state: 'DENIED' }) });
+    const api = scriptedApi({
+      getSection: () => ({ state: 'DENIED' }),
+      getAccessInfo: () => ({
+        ok: true,
+        data: {
+          title: 'Q4 plan',
+          classification: 'CONFIDENTIAL',
+          administrators: [{ accountId: 'alice', displayName: 'Alice' }],
+          myRequest: null,
+        },
+      }),
+    });
     const { container } = renderWithI18n(<App api={api} />);
     expect(await screen.findByText('This section is protected')).toBeTruthy();
+    expect(await screen.findByText('Q4 plan')).toBeTruthy();
+    expect(screen.getByText(/Administrators: Alice/)).toBeTruthy();
     expect(container.textContent).not.toContain('Quarterly');
     await expectNoA11yViolations(container);
+  });
+
+  it('denied: sending a request shows the pending state without leaking content', async () => {
+    let pending = false;
+    const api = scriptedApi({
+      getSection: () => ({ state: 'DENIED' }),
+      getAccessInfo: () => ({
+        ok: true,
+        data: {
+          title: null,
+          classification: null,
+          administrators: [],
+          myRequest: pending
+            ? { role: 'VIEW', reason: 'Need the table', requestedAt: '2026-01-01T00:00:00.000Z' }
+            : null,
+        },
+      }),
+      requestAccess: (p) => {
+        pending = true;
+        return {
+          ok: true,
+          data: {
+            title: null,
+            classification: null,
+            administrators: [],
+            myRequest: {
+              role: (p as { role: 'VIEW' }).role,
+              reason: (p as { reason?: string }).reason ?? '',
+              requestedAt: '2026-01-01T00:00:00.000Z',
+            },
+          },
+        };
+      },
+    });
+    const { container } = renderWithI18n(<App api={api} />);
+    await userEvent.type(await screen.findByLabelText('Reason (optional)'), 'Need the table');
+    await userEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    expect(await screen.findByText(/Your request for “Can view” is pending/)).toBeTruthy();
+    expect(api.calls.find((c) => c.fn === 'requestAccess')?.payload).toEqual({
+      role: 'VIEW',
+      reason: 'Need the table',
+    });
+    expect(container.textContent).not.toContain('Quarterly');
   });
 
   it('unavailable: retry reloads', async () => {
@@ -251,6 +307,7 @@ describe('Permissions panel', () => {
     const api = scriptedApi({
       getSection: () => readyView(),
       listGrants: () => grants,
+      listAccessRequests: () => ({ ok: true, data: { requests: [], aclVersion: 3 } }),
       getEffectiveAccess: () => ({
         ok: true,
         data: {
@@ -280,6 +337,7 @@ describe('Permissions panel', () => {
     const api = scriptedApi({
       getSection: () => readyView(),
       listGrants: () => grants,
+      listAccessRequests: () => ({ ok: true, data: { requests: [], aclVersion: 3 } }),
       getEffectiveAccess: () => ({ ok: false, code: 'DENIED' }),
       revokeGrant: () => ({ ok: true, data: { ...grants.data, grants: [grants.data.grants[0]] } }),
     });
@@ -293,6 +351,52 @@ describe('Permissions panel', () => {
     expect(api.calls.find((c) => c.fn === 'revokeGrant')?.payload).toEqual({
       principalType: 'GROUP',
       principalId: 'g1',
+      expectedAclVersion: 3,
+    });
+  });
+
+  it('shows a pending-request queue and approves with the expected ACL version', async () => {
+    const api = scriptedApi({
+      getSection: () => readyView(),
+      listGrants: () => grants,
+      listAccessRequests: () => ({
+        ok: true,
+        data: {
+          aclVersion: 3,
+          requests: [
+            {
+              accountId: 'bob',
+              displayName: 'Bob',
+              active: true,
+              role: 'VIEW',
+              reason: 'Need the table',
+              requestedAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+        },
+      }),
+      getEffectiveAccess: () => ({
+        ok: true,
+        data: {
+          role: 'ADMINISTER',
+          canEditPage: true,
+          sources: [],
+          groupResolution: 'OK',
+        },
+      }),
+      resolveAccessRequest: () => ({ ok: true, data: { requests: [], aclVersion: 4 } }),
+    });
+    renderWithI18n(<App api={api} />);
+    await screen.findByText('Quarterly numbers');
+    expect(await screen.findByLabelText(/1 pending requests/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('tab', { name: /Permissions/ }));
+    expect(await screen.findByText(/Bob asks for: Can view/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /Approve/ }));
+    expect(await screen.findByText('Access granted.')).toBeTruthy();
+    expect(api.calls.find((c) => c.fn === 'resolveAccessRequest')?.payload).toEqual({
+      accountId: 'bob',
+      decision: 'APPROVE',
+      role: 'VIEW',
       expectedAclVersion: 3,
     });
   });

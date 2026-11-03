@@ -1,8 +1,12 @@
 import {
   EMPTY_DOC,
+  REQUEST_REASON_MAX_LENGTH,
   roleAtLeast,
   safeValidateDoc,
   validateDoc,
+  type AccessInfo,
+  type AccessRequestItem,
+  type AccessRequestList,
   type AuditEntry,
   type AuditList,
   type ContentPayload,
@@ -16,6 +20,7 @@ import {
   type RetentionConfig,
   type RevisionList,
   type RevisionSummary,
+  type RequestableRole,
   type Role,
   type RichDoc,
   type SectionMeta,
@@ -25,6 +30,7 @@ import {
   TITLE_MAX_LENGTH,
   isClassification,
   isPrincipalType,
+  isRequestableRole,
   isRole,
 } from '@secure-sections/shared';
 import { GatewayError, type ConfluenceGateway } from '../ports/confluence';
@@ -48,8 +54,10 @@ import {
   Idx,
   Keys,
   LIMITS,
+  REQUEST_TTL_DAYS,
   SCHEMA_VERSION,
   UUID_RE,
+  type AccessRequestRec,
   type AuditDoc,
   type AuditMeta,
   type BindingDoc,
@@ -687,7 +695,15 @@ export class SecureSectionService {
             },
           ];
       if (!this.hasDirectAdmin(grants)) throw new DomainError('LAST_ADMINISTRATOR');
-      const next: SectionDoc = { ...s, grants, aclVersion: s.aclVersion + 1, updatedAt: now };
+      const next: SectionDoc = {
+        ...s,
+        grants,
+        aclVersion: s.aclVersion + 1,
+        updatedAt: now,
+        ...(s.requests && p.type === 'USER'
+          ? { requests: s.requests.filter((x) => x.accountId !== p.id) }
+          : {}),
+      };
       const { audit, op } = this.chain(s, existing ? 'GRANT_UPDATE' : 'GRANT_ADD', ctx.accountId, {
         principalType: p.type,
         principalId: p.id,
@@ -781,6 +797,213 @@ export class SecureSectionService {
       next.auditHead = audit.hash;
       await this.store.transact([this.putSection(r.section, next), op]);
       return this.grantList(next);
+    });
+  }
+
+  // ---------------------------------------------------------------- access requests
+
+  private liveRequests(s: SectionDoc): AccessRequestRec[] {
+    const cutoff = this.clock.now().getTime() - REQUEST_TTL_DAYS * 86_400_000;
+    return (s.requests ?? []).filter((r) => Date.parse(r.requestedAt) > cutoff);
+  }
+
+  /**
+   * Gate for the "I have no access" operations: the caller can view the page, the macro is bound
+   * to an active section, and the caller has no role on it. Everything else is generic.
+   */
+  private async requireRequester(ctx: TrustedContext): Promise<BoundResolved> {
+    const r = await this.authz.resolve(ctx);
+    if (r.kind !== 'BOUND') throw new DomainError(r.kind === 'UNBOUND' ? 'NOT_FOUND' : 'DENIED');
+    if (r.role.role !== null) throw new DomainError('DENIED');
+    if (!r.role.groupsComplete) throw new DomainError('UNAVAILABLE');
+    return r;
+  }
+
+  private async accessInfoOf(s: SectionDoc, accountId: string): Promise<AccessInfo> {
+    const adminIds = s.grants
+      .filter((g) => g.principalType === 'USER' && g.role === 'ADMINISTER')
+      .map((g) => g.principalId);
+    const administrators: AccessInfo['administrators'] = [];
+    if (adminIds.length) {
+      try {
+        const users = await this.gateway.users(adminIds);
+        for (const id of adminIds) {
+          const u = users.get(id);
+          if (u?.active) administrators.push({ accountId: id, displayName: u.displayName });
+          if (administrators.length >= LIMITS.maxAdminNamesShown) break;
+        }
+      } catch {
+        /* names are best effort */
+      }
+    }
+    const mine = this.liveRequests(s).find((r) => r.accountId === accountId);
+    return {
+      title: s.title ?? null,
+      classification: s.classification ?? null,
+      administrators,
+      myRequest: mine
+        ? { role: mine.role, reason: mine.reason, requestedAt: mine.requestedAt }
+        : null,
+    };
+  }
+
+  async getAccessInfo(ctx: TrustedContext): Promise<AccessInfo> {
+    const r = await this.requireRequester(ctx);
+    return this.accessInfoOf(r.section.value, ctx.accountId);
+  }
+
+  async requestAccess(
+    ctx: TrustedContext,
+    input: { role: unknown; reason: unknown },
+  ): Promise<AccessInfo> {
+    if (!isRequestableRole(input.role)) throw new DomainError('INVALID_REQUEST');
+    const role: RequestableRole = input.role;
+    const reason = parseReason(input.reason);
+    return this.withRetry(async () => {
+      const r = await this.requireRequester(ctx);
+      const s = r.section.value;
+      const live = this.liveRequests(s);
+      const existing = live.find((x) => x.accountId === ctx.accountId);
+      if (existing?.role === role && existing.reason === reason) {
+        return this.accessInfoOf(s, ctx.accountId);
+      }
+      if (!existing && live.length >= LIMITS.maxPendingRequests) {
+        throw new DomainError('RATE_LIMITED');
+      }
+      const requests: AccessRequestRec[] = [
+        ...live.filter((x) => x.accountId !== ctx.accountId),
+        { accountId: ctx.accountId, role, reason, requestedAt: this.nowIso() },
+      ];
+      const next: SectionDoc = { ...s, requests, updatedAt: this.nowIso() };
+      const { audit, op } = this.chain(s, 'ACCESS_REQUEST', ctx.accountId, {
+        role,
+        hasReason: reason !== '',
+      });
+      next.auditHead = audit.hash;
+      await this.store.transact([this.putSection(r.section, next), op]);
+      return this.accessInfoOf(next, ctx.accountId);
+    });
+  }
+
+  async cancelAccessRequest(ctx: TrustedContext): Promise<AccessInfo> {
+    return this.withRetry(async () => {
+      const r = await this.requireRequester(ctx);
+      const s = r.section.value;
+      const live = this.liveRequests(s);
+      if (!live.some((x) => x.accountId === ctx.accountId)) {
+        return this.accessInfoOf(s, ctx.accountId);
+      }
+      const next: SectionDoc = {
+        ...s,
+        requests: live.filter((x) => x.accountId !== ctx.accountId),
+        updatedAt: this.nowIso(),
+      };
+      const { audit, op } = this.chain(s, 'ACCESS_REQUEST_CANCEL', ctx.accountId, {});
+      next.auditHead = audit.hash;
+      await this.store.transact([this.putSection(r.section, next), op]);
+      return this.accessInfoOf(next, ctx.accountId);
+    });
+  }
+
+  private async requestList(s: SectionDoc): Promise<AccessRequestList> {
+    const live = this.liveRequests(s);
+    let users = new Map<string, { displayName: string; active: boolean }>();
+    if (live.length) {
+      try {
+        users = await this.gateway.users(live.map((x) => x.accountId));
+      } catch {
+        /* names are best effort */
+      }
+    }
+    const requests: AccessRequestItem[] = live
+      .map((x) => ({
+        accountId: x.accountId,
+        displayName: users.get(x.accountId)?.displayName ?? x.accountId,
+        active: users.get(x.accountId)?.active ?? true,
+        role: x.role,
+        reason: x.reason,
+        requestedAt: x.requestedAt,
+      }))
+      .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+    return { requests, aclVersion: s.aclVersion };
+  }
+
+  async listAccessRequests(ctx: TrustedContext): Promise<AccessRequestList> {
+    const r = await this.requireBound(ctx, 'ADMINISTER', {
+      op: 'requests-read',
+      auditDenied: true,
+    });
+    return this.requestList(r.section.value);
+  }
+
+  async resolveAccessRequest(
+    ctx: TrustedContext,
+    input: { accountId: unknown; decision: unknown; role: unknown; expectedAclVersion: unknown },
+  ): Promise<AccessRequestList> {
+    const p = this.validatePrincipal('USER', input.accountId);
+    if (input.decision !== 'APPROVE' && input.decision !== 'REJECT') {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    const approve = input.decision === 'APPROVE';
+    if (input.role !== undefined && !isRequestableRole(input.role)) {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    const roleOverride: RequestableRole | undefined = input.role;
+    const expected = parseVersion(input.expectedAclVersion);
+    if (approve) await this.assertPrincipalExists('USER', p.id);
+    return this.withRetry(async () => {
+      const r = await this.requireBound(ctx, 'ADMINISTER', {
+        op: 'requests-write',
+        auditDenied: true,
+      });
+      const s = r.section.value;
+      const live = this.liveRequests(s);
+      const request = live.find((x) => x.accountId === p.id);
+      if (!request) throw new DomainError('NOT_FOUND');
+      const remaining = live.filter((x) => x !== request);
+      const now = this.nowIso();
+      if (!approve) {
+        const next: SectionDoc = { ...s, requests: remaining, updatedAt: now };
+        const { audit, op } = this.chain(s, 'ACCESS_REQUEST_REJECT', ctx.accountId, {
+          principalId: p.id,
+        });
+        next.auditHead = audit.hash;
+        await this.store.transact([this.putSection(r.section, next), op]);
+        return this.requestList(next);
+      }
+      if (s.aclVersion !== expected) {
+        throw new DomainError('CONFLICT', { currentAclVersion: s.aclVersion });
+      }
+      const role = roleOverride ?? request.role;
+      const existing = s.grants.find((g) => g.principalType === 'USER' && g.principalId === p.id);
+      if (!existing && s.grants.length >= LIMITS.maxGrants) throw new DomainError('RATE_LIMITED');
+      const grants = existing
+        ? s.grants.map((g) => (g === existing && !roleAtLeast(g.role, role) ? { ...g, role } : g))
+        : [
+            ...s.grants,
+            {
+              principalType: 'USER' as const,
+              principalId: p.id,
+              role,
+              addedAt: now,
+              addedBy: ctx.accountId,
+            },
+          ];
+      const next: SectionDoc = {
+        ...s,
+        grants,
+        requests: remaining,
+        aclVersion: s.aclVersion + 1,
+        updatedAt: now,
+      };
+      const { audit, op } = this.chain(s, 'ACCESS_REQUEST_APPROVE', ctx.accountId, {
+        principalId: p.id,
+        role,
+        requestedRole: request.role,
+      });
+      next.auditHead = audit.hash;
+      await this.store.transact([this.putSection(r.section, next), op]);
+      return this.requestList(next);
     });
   }
 
@@ -1191,6 +1414,16 @@ function parseTitle(v: unknown): string | null {
   const t = v.trim();
   if (t === '') return null;
   if (t.length > TITLE_MAX_LENGTH || hasControlChars(t)) {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  return t;
+}
+
+function parseReason(v: unknown): string {
+  if (v === undefined || v === null) return '';
+  if (typeof v !== 'string') throw new DomainError('INVALID_REQUEST');
+  const t = v.trim();
+  if (t.length > REQUEST_REASON_MAX_LENGTH || hasControlChars(t)) {
     throw new DomainError('INVALID_REQUEST');
   }
   return t;

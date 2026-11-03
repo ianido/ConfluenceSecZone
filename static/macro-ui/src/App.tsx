@@ -12,12 +12,14 @@ import {
   docIsEmpty,
   isClassification,
   roleAtLeast,
+  type AccessInfo,
   type Classification,
   type ContentPayload,
   type SectionMeta,
   type SectionView,
 } from '@secure-sections/shared';
 import { ApiError, safeCall, unwrap, type Api } from './api';
+import { AccessRequestBox } from './Access';
 import { EditPanel } from './Editor';
 import { SectionHeader } from './Header';
 import { useT } from './i18n';
@@ -91,15 +93,7 @@ export function App({ api }: { api: Api }) {
   }
   switch (view.state) {
     case 'DENIED':
-      return (
-        <StateCard title={t('state.denied.title')} body={t('state.denied.body')}>
-          <details>
-            <summary>{t('nav.help')}</summary>
-            <p>{t('perm.requestAccess')}</p>
-            <HelpPanel api={api} userRole={null} />
-          </details>
-        </StateCard>
-      );
+      return <Denied api={api} />;
     case 'UNAVAILABLE':
       return (
         <StateCard
@@ -127,6 +121,30 @@ export function App({ api }: { api: Api }) {
     case 'READY':
       return <Ready api={api} view={view} reload={() => void load()} />;
   }
+}
+
+function Denied({ api }: { api: Api }) {
+  const t = useT();
+  const [info, setInfo] = useState<AccessInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    void safeCall(api, 'getAccessInfo', {}).then((res) => {
+      if (live && res.ok) setInfo(res.data);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api]);
+  return (
+    <StateCard title={t('state.denied.title')} body={t('state.denied.body')}>
+      {info && <AccessRequestBox api={api} info={info} onInfo={setInfo} />}
+      <details>
+        <summary>{t('nav.help')}</summary>
+        <p>{t('perm.requestAccess')}</p>
+        <HelpPanel api={api} userRole={null} />
+      </details>
+    </StateCard>
+  );
 }
 
 function Unconfigured({
@@ -289,6 +307,8 @@ function Ready({
   const [content, setContent] = useState<ContentPayload>(view.content);
   const [meta, setMeta] = useState<SectionMeta>(view.meta);
   const [editing, setEditing] = useState(false);
+  const [pending, setPending] = useState(0);
+  const isAdmin = roleAtLeast(view.role, 'ADMINISTER');
   const tabs: Tab[] = ['content'];
   if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('permissions');
   if (roleAtLeast(view.role, 'MODIFY')) tabs.push('history');
@@ -297,6 +317,16 @@ function Ready({
 
   useEffect(() => setContent(view.content), [view.content]);
   useEffect(() => setMeta(view.meta), [view.meta]);
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    let live = true;
+    void safeCall(api, 'listAccessRequests', {}).then((res) => {
+      if (live && res.ok) setPending(res.data.requests.length);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, isAdmin]);
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, idx: number) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -331,6 +361,15 @@ function Ready({
             onKeyDown={(e) => onKey(e, i)}
           >
             {t(`nav.${id === 'audit' ? 'audit' : id}`)}
+            {id === 'permissions' && pending > 0 && (
+              <span
+                className="ss-count"
+                role="img"
+                aria-label={`${pending} ${t('requests.badge')}`}
+              >
+                {pending}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -382,7 +421,7 @@ function Ready({
               </div>
             </section>
           ))}
-        {tab === 'permissions' && <PermissionsPanel api={api} />}
+        {tab === 'permissions' && <PermissionsPanel api={api} onPending={setPending} />}
         {tab === 'history' && (
           <HistoryPanel
             api={api}

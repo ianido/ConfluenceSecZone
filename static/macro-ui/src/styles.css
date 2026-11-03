@@ -378,3 +378,43 @@ select {
   stroke-linejoin: round;
   vertical-align: middle;
 }
+
+.ss-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--ss-warn-bg);
+  border: 1px solid var(--ss-border);
+  color: var(--ss-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.ss-requests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ss-requests li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ss-border);
+}
+.ss-requests li:last-child {
+  border-bottom: 0;
+}
+.ss-request {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+}
+.ss-request h3,
+.ss-access-title {
+  margin: 0;
+}
