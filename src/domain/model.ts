@@ -103,6 +103,7 @@ export interface RevisionDoc {
   createdAt: string;
   restoredFrom: number | null;
   changeNote?: string | null;
+  tag?: string | null;
 }
 
 export type AuditMeta = Record<string, string | number | boolean | null>;

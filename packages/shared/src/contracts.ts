@@ -37,6 +37,7 @@ export const RESOLVER_FUNCTIONS = [
   'copyGrants',
   'seedPageRestrictions',
   'dismissNotice',
+  'setRevisionTag',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -197,6 +198,7 @@ export interface PrincipalHit {
 }
 
 export const CHANGE_NOTE_MAX_LENGTH = 140;
+export const REVISION_TAG_MAX_LENGTH = 40;
 
 export interface RevisionSummary {
   version: number;
@@ -205,6 +207,7 @@ export interface RevisionSummary {
   restoredFrom: number | null;
   bytes: number;
   changeNote: string | null;
+  tag: string | null;
 }
 
 export interface RevisionList {
@@ -229,6 +232,7 @@ export type AuditAction =
   | 'ACCESS_REQUEST_CANCEL'
   | 'ACCESS_REQUEST_APPROVE'
   | 'ACCESS_REQUEST_REJECT'
+  | 'REVISION_TAG'
   | 'ACCESS_DENIED'
   | 'RETENTION_PURGE';
 
@@ -343,6 +347,10 @@ export interface RequestMap {
     res: Result<GrantList>;
   };
   dismissNotice: { req: Record<string, never>; res: Result<{ dismissed: true }> };
+  setRevisionTag: {
+    req: { version: number; tag: string | null };
+    res: Result<RevisionSummary>;
+  };
 }
 
 export type RequestOf<K extends ResolverFunction> = RequestMap[K]['req'];

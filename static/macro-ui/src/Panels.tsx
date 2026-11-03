@@ -556,7 +556,12 @@ export function HistoryPanel({
     from: number;
     to: number;
     lines: ReturnType<typeof diffDocs>;
+    left: RichDoc;
+    right: RichDoc;
   } | null>(null);
+  const [fromVersion, setFromVersion] = useState('');
+  const [toVersion, setToVersion] = useState('');
+  const [tagDraft, setTagDraft] = useState<Record<number, string>>({});
   const [confirm, setConfirm] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -564,10 +569,74 @@ export function HistoryPanel({
   if (hist.error || !hist.data)
     return <ErrorBox error={hist.error ?? new ApiError('UNAVAILABLE')} onRetry={hist.reload} />;
   const fmt = (iso: string) => new Date(iso).toLocaleString();
+  const openCompare = async (from: number, to: number) => {
+    const [a, b] = await Promise.all([
+      safeCall(api, 'getRevision', { version: from }),
+      safeCall(api, 'getRevision', { version: to }),
+    ]);
+    if (a.ok && b.ok) {
+      setCompare({
+        from,
+        to,
+        lines: diffDocs(a.data.doc, b.data.doc),
+        left: a.data.doc,
+        right: b.data.doc,
+      });
+    } else setError(t('error.generic'));
+  };
 
   return (
     <Panel title={t('history.title')}>
       {hist.data.revisions.length <= 1 && <p className="ss-muted">{t('history.empty')}</p>}
+      {hist.data.revisions.length > 1 && (
+        <form
+          className="ss-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void openCompare(Number(fromVersion), Number(toVersion));
+          }}
+        >
+          <label>
+            {t('history.compare.pick')}
+            <select
+              aria-label={t('history.compare.from')}
+              value={fromVersion}
+              onChange={(e) => setFromVersion(e.target.value)}
+            >
+              <option value="">{t('history.compare.from')}</option>
+              {hist.data.revisions.map((r) => (
+                <option key={`from-${r.version}`} value={r.version}>
+                  v{r.version}
+                  {r.tag ? ` · ${r.tag}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="ss-sr">{t('history.compare.to')}</span>
+            <select
+              aria-label={t('history.compare.to')}
+              value={toVersion}
+              onChange={(e) => setToVersion(e.target.value)}
+            >
+              <option value="">{t('history.compare.to')}</option>
+              {hist.data.revisions.map((r) => (
+                <option key={`to-${r.version}`} value={r.version}>
+                  v{r.version}
+                  {r.tag ? ` · ${r.tag}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="ss-btn"
+            disabled={fromVersion === '' || toVersion === '' || fromVersion === toVersion}
+          >
+            {t('history.compare.any')}
+          </button>
+        </form>
+      )}
       <ol className="ss-history">
         {hist.data.revisions.map((r) => (
           <li key={r.version}>
@@ -575,7 +644,39 @@ export function HistoryPanel({
               v{r.version} · {fmt(r.createdAt)} · {r.author?.displayName ?? '—'}
               {r.restoredFrom ? ` · ↩ v${r.restoredFrom}` : ''}
               {r.changeNote ? ` · ${r.changeNote}` : ''}
+              {r.tag ? ` · ${r.tag}` : ''}
             </span>
+            {canWrite && (
+              <form
+                className="ss-row"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void (async () => {
+                    const res = await safeCall(api, 'setRevisionTag', {
+                      version: r.version,
+                      tag: (tagDraft[r.version] ?? r.tag ?? '').trim() || null,
+                    });
+                    if (res.ok) hist.reload();
+                    else setError(t('error.generic'));
+                  })();
+                }}
+              >
+                <label>
+                  <span className="ss-sr">{t('history.tag')}</span>
+                  <input
+                    aria-label={`${t('history.tag')} v${r.version}`}
+                    maxLength={40}
+                    value={tagDraft[r.version] ?? r.tag ?? ''}
+                    onChange={(e) =>
+                      setTagDraft((cur) => ({ ...cur, [r.version]: e.target.value }))
+                    }
+                  />
+                </label>
+                <button type="submit" className="ss-btn">
+                  {t('history.tag.save')}
+                </button>
+              </form>
+            )}
             <button
               type="button"
               className="ss-btn"
@@ -596,19 +697,7 @@ export function HistoryPanel({
               <button
                 type="button"
                 className="ss-btn"
-                onClick={async () => {
-                  const [a, b] = await Promise.all([
-                    safeCall(api, 'getRevision', { version: r.version - 1 }),
-                    safeCall(api, 'getRevision', { version: r.version }),
-                  ]);
-                  if (a.ok && b.ok) {
-                    setCompare({
-                      from: r.version - 1,
-                      to: r.version,
-                      lines: diffDocs(a.data.doc, b.data.doc),
-                    });
-                  } else setError(t('error.generic'));
-                }}
+                onClick={() => void openCompare(r.version - 1, r.version)}
               >
                 {t('history.compare')}
               </button>
@@ -657,6 +746,16 @@ export function HistoryPanel({
           aria-label={t('history.compare.title', { from: compare.from, to: compare.to })}
         >
           <h3>{t('history.compare.title', { from: compare.from, to: compare.to })}</h3>
+          <div className="ss-side">
+            <div>
+              <h4>v{compare.from}</h4>
+              <RichRenderer doc={compare.left} />
+            </div>
+            <div>
+              <h4>v{compare.to}</h4>
+              <RichRenderer doc={compare.right} />
+            </div>
+          </div>
           {compare.lines.every((l) => l.kind === 'equal') ? (
             <p className="ss-muted">{t('history.compare.empty')}</p>
           ) : (

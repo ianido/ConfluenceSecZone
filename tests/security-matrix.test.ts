@@ -58,6 +58,7 @@ describe('resolver surface: every function denies unauthorised callers and leaks
     },
     seedPageRestrictions: { expectedAclVersion: 1 },
     dismissNotice: {},
+    setRevisionTag: { version: 1, tag: 'approved' },
   };
 
   for (const fn of RESOLVER_FUNCTIONS.filter((f) => f !== 'createSection')) {

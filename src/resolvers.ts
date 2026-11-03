@@ -149,6 +149,9 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
       service.seedPageRestrictions(ctx, p.expectedAclVersion),
     ),
     dismissNotice: guarded('dismissNotice', (ctx) => service.dismissNotice(ctx)),
+    setRevisionTag: guarded('setRevisionTag', (ctx, p) =>
+      service.setRevisionTag(ctx, p.version, p.tag),
+    ),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,

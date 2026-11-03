@@ -1,5 +1,6 @@
 import {
   CHANGE_NOTE_MAX_LENGTH,
+  REVISION_TAG_MAX_LENGTH,
   EMPTY_DOC,
   REQUEST_REASON_MAX_LENGTH,
   roleAtLeast,
@@ -567,6 +568,7 @@ export class SecureSectionService {
       restoredFrom: v.restoredFrom,
       bytes: v.bytes,
       changeNote: v.changeNote ?? null,
+      tag: v.tag ?? null,
     };
   }
 
@@ -602,6 +604,50 @@ export class SecureSectionService {
     const doc = this.decodeRevision(rev.value);
     const authors = await this.userMap([rev.value.authorAccountId]);
     return { doc, summary: this.summary(rev.value, authors) };
+  }
+
+  async setRevisionTag(
+    ctx: TrustedContext,
+    version: unknown,
+    tag: unknown,
+  ): Promise<RevisionSummary> {
+    if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    const label = parseRevisionTag(tag);
+    return this.withRetry(async () => {
+      const r = await this.requireBound(ctx, 'MODIFY', {
+        pageEdit: true,
+        op: 'tag',
+        auditDenied: true,
+      });
+      const key = Keys.revision(r.section.value.sectionId, version);
+      const rev = await this.store.get<RevisionDoc>('revision', key);
+      if (!rev || rev.value.sectionId !== r.section.value.sectionId) {
+        throw new DomainError('NOT_FOUND');
+      }
+      if ((rev.value.tag ?? null) === label) {
+        return this.summary(rev.value, await this.userMap([rev.value.authorAccountId]));
+      }
+      const nextRev: RevisionDoc = { ...rev.value, tag: label };
+      const s = r.section.value;
+      const now = this.nowIso();
+      const { audit, op } = this.chain(s, 'REVISION_TAG', ctx.accountId, { version });
+      const nextSection: SectionDoc = { ...s, auditHead: audit.hash, updatedAt: now };
+      await this.store.transact([
+        {
+          kind: 'put',
+          entity: 'revision',
+          key,
+          value: nextRev,
+          index: Idx.revision(s.sectionId, version),
+          expectRev: rev.rev,
+        },
+        this.putSection(r.section, nextSection),
+        op,
+      ]);
+      return this.summary(nextRev, await this.userMap([nextRev.authorAccountId]));
+    });
   }
 
   async restoreRevision(
@@ -1640,6 +1686,17 @@ function parseTitle(v: unknown): string | null {
   const t = v.trim();
   if (t === '') return null;
   if (t.length > TITLE_MAX_LENGTH || hasControlChars(t)) {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  return t;
+}
+
+function parseRevisionTag(v: unknown): string | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'string') throw new DomainError('INVALID_REQUEST');
+  const t = v.trim();
+  if (t === '') return null;
+  if (t.length > REVISION_TAG_MAX_LENGTH || hasControlChars(t)) {
     throw new DomainError('INVALID_REQUEST');
   }
   return t;
