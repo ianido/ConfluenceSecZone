@@ -15,4 +15,5 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 ### Security
 
 - Pinned `prosemirror-view` >= 1.42.9 (GHSA-c8x8-7fp4-3x9w) and removed a duplicate ProseMirror copy from the bundle.
+- Added `overrides` for `uuid` (>= 14), `glob` (>= 14.0.2) and `readdir-glob`/`typescript-estree` `minimatch` (>= 11.0.1) to clear Dependabot security alerts that `@forge/cli` and `@forge/bridge` ranges blocked.
 - Added the missing `report:personal-data` scope and a 7-day personal-data reporting floor.
