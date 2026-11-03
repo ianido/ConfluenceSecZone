@@ -2173,10 +2173,12 @@ function parseSitePolicy(raw: unknown): SitePolicy {
   if (o.whoMayCreate !== 'PAGE_EDITORS' && o.whoMayCreate !== 'SITE_ADMINS') {
     throw new DomainError('INVALID_REQUEST');
   }
-  if (!Array.isArray(o.classes)) throw new DomainError('INVALID_REQUEST');
+  const classList: unknown = o.classes;
+  if (!Array.isArray(classList)) throw new DomainError('INVALID_REQUEST');
   const classes = DEFAULT_SITE_POLICY.classes.map((fallback) => {
-    const found = o.classes.find(
-      (c) => typeof c === 'object' && c !== null && (c as { id?: unknown }).id === fallback.id,
+    const found = classList.find(
+      (c: unknown) =>
+        typeof c === 'object' && c !== null && (c as { id?: unknown }).id === fallback.id,
     ) as { watermark?: unknown; protectCopy?: unknown; autoLockMinutes?: unknown } | undefined;
     if (!found) throw new DomainError('INVALID_REQUEST');
     const minutes = found.autoLockMinutes;

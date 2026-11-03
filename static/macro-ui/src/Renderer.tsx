@@ -81,7 +81,14 @@ function inline(n: InlineNode, key: number, onReveal?: (label: string) => void):
     );
   }
   if (n.type === 'secret') {
-    return <SecretChip key={key} label={n.attrs.label} value={n.attrs.value} onReveal={onReveal} />;
+    return (
+      <SecretChip
+        key={key}
+        label={n.attrs.label}
+        value={n.attrs.value}
+        {...(onReveal ? { onReveal } : {})}
+      />
+    );
   }
   let el: ReactNode = n.text;
   for (const m of n.marks ?? []) {

@@ -59,7 +59,9 @@ describe('site administration', () => {
         expiresAt: soon,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
-    await expect(w.service.requestAccess(ctxFor('bob'), { role: 'VIEW' })).rejects.toMatchObject({
+    await expect(
+      w.service.requestAccess(ctxFor('bob'), { role: 'VIEW', reason: '' }),
+    ).rejects.toMatchObject({
       code: 'DENIED',
     });
   });
