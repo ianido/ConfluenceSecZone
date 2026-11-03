@@ -1005,7 +1005,7 @@ export class SecureSectionService {
 
   async resolveAccessRequest(
     ctx: TrustedContext,
-    input: { accountId: unknown; decision: unknown; role: unknown; expectedAclVersion: unknown },
+    input: { accountId: unknown; decision: unknown; role?: unknown; expectedAclVersion: unknown },
   ): Promise<AccessRequestList> {
     const p = this.validatePrincipal('USER', input.accountId);
     if (input.decision !== 'APPROVE' && input.decision !== 'REJECT') {
