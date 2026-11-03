@@ -270,6 +270,7 @@ describe('Section header', () => {
     expect(api.calls.find((c) => c.fn === 'createSection')?.payload).toEqual({
       title: 'HR memo',
       classification: 'INTERNAL',
+      template: 'blank',
     });
   });
 });

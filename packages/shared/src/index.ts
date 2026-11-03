@@ -3,3 +3,4 @@ export * from './editor-schema.js';
 export * from './contracts.js';
 export * from './i18n.js';
 export * from './diff.js';
+export * from './templates.js';

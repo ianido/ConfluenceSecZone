@@ -82,7 +82,8 @@ describe('resolver surface: every function denies unauthorised callers and leaks
         fn === 'requestAccess' ||
         fn === 'cancelAccessRequest' ||
         fn === 'listMySections' ||
-        fn === 'exportMyAudit'
+        fn === 'exportMyAudit' ||
+        fn === 'listPageSections'
       ) {
         // Public metadata and the caller's own request. Title/classification are not secret.
         expect(res).toMatchObject({ ok: true });

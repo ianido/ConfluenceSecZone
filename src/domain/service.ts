@@ -1,7 +1,6 @@
 import {
   CHANGE_NOTE_MAX_LENGTH,
   REVISION_TAG_MAX_LENGTH,
-  EMPTY_DOC,
   REQUEST_REASON_MAX_LENGTH,
   maxRole,
   roleAtLeast,
@@ -33,11 +32,15 @@ import {
   type AdminOverview,
   type AuditExport,
   type MySections,
+  type PageSectionRow,
   type SitePolicy,
   type UserSummary,
   type AuditAction,
   MAX_GRANT_TTL_DAYS,
   TITLE_MAX_LENGTH,
+  isSectionTemplate,
+  templateDoc,
+  type SectionTemplate,
   isClassification,
   isPrincipalType,
   isRequestableRole,
@@ -468,9 +471,16 @@ export class SecureSectionService {
     ctx: TrustedContext,
     rawTitle?: unknown,
     rawClassification?: unknown,
+    rawOptions?: unknown,
   ): Promise<SectionView> {
     const title = parseTitle(rawTitle);
     const classification = parseClassification(rawClassification);
+    const options = parseCreateOptions(rawOptions);
+    for (const g of options.initialGrants) {
+      if (g.principalId === ctx.accountId && g.principalType === 'USER') continue;
+      await this.assertPrincipalExists(g.principalType, g.principalId);
+    }
+    const seeded = templateDoc(options.template);
     return this.withRetry(async () => {
       const r = await this.authz.resolve(ctx);
       if (r.kind === 'NO_ACCESS') throw new DomainError('DENIED');
@@ -510,11 +520,28 @@ export class SecureSectionService {
             addedAt: now,
             addedBy: ctx.accountId,
           },
+          ...options.initialGrants
+            .filter((g) => !(g.principalType === 'USER' && g.principalId === ctx.accountId))
+            .map((g) => ({ ...g, addedAt: now, addedBy: ctx.accountId })),
         ],
         bindings: [{ pageId: ctx.pageId, localId: ctx.localId }],
         auditHead: GENESIS_HASH,
         ...(title ? { title } : {}),
         ...(classification ? { classification } : {}),
+        ...(options.initialGrants.some(
+          (g) => g.principalType === 'USER' && g.principalId !== ctx.accountId,
+        )
+          ? {
+              notices: options.initialGrants
+                .filter((g) => g.principalType === 'USER' && g.principalId !== ctx.accountId)
+                .map((g) => ({
+                  accountId: g.principalId,
+                  role: g.role,
+                  addedBy: ctx.accountId,
+                  at: now,
+                })),
+            }
+          : {}),
       };
       const { audit, op: auditOp } = this.chain(section, 'SECTION_CREATE', ctx.accountId, {
         pageId: ctx.pageId,
@@ -540,7 +567,7 @@ export class SecureSectionService {
           index: Idx.section(sectionId),
         },
         this.bindingOp(binding, r.staleBinding),
-        this.revisionOp(this.buildRevision(sectionId, 1, EMPTY_DOC, ctx.accountId, null)),
+        this.revisionOp(this.buildRevision(sectionId, 1, seeded, ctx.accountId, null)),
         auditOp,
       ]);
       return this.getSection(ctx);
@@ -1939,6 +1966,39 @@ export class SecureSectionService {
     });
   }
 
+  async listPageSections(ctx: SiteContext): Promise<{ sections: PageSectionRow[] }> {
+    if (!ctx.pageId) throw new DomainError('DENIED');
+    const page = await this.authz.pageAccess(ctx.accountId, ctx.pageId);
+    if (!page.canView) throw new DomainError('DENIED');
+    let groupIds = new Set<string>();
+    try {
+      const membership = await this.gateway.groupMembership(ctx.accountId);
+      if (membership.complete) groupIds = new Set(membership.groupIds);
+    } catch (e) {
+      if (!(e instanceof GatewayError)) throw e;
+    }
+    const bindings = await this.store.list<BindingDoc>({
+      entity: 'binding',
+      partition: `page:${ctx.pageId}`,
+      order: 'ASC',
+      limit: LIMITS.maxBindingsPerPage,
+    });
+    const now = this.clock.now().getTime();
+    const sections: PageSectionRow[] = [];
+    for (const b of bindings.items) {
+      if (b.value.cloudId !== ctx.cloudId) continue;
+      const sec = await this.store.get<SectionDoc>('section', Keys.section(b.value.sectionId));
+      if (!sec || sec.value.status !== 'ACTIVE' || sec.value.cloudId !== ctx.cloudId) continue;
+      sections.push({
+        localId: b.value.localId,
+        title: sec.value.title ?? null,
+        classification: sec.value.classification ?? null,
+        role: this.directRole(sec.value, ctx.accountId, groupIds, now),
+      });
+    }
+    return { sections };
+  }
+
   async getAdminOverview(ctx: SiteContext): Promise<AdminOverview> {
     await this.requireSiteAdmin(ctx.accountId);
     const listed = await this.store.list<SectionDoc>({
@@ -2069,6 +2129,34 @@ function csvCell(value: string): string {
 }
 
 export { validateDoc };
+
+function parseCreateOptions(raw: unknown): {
+  template: SectionTemplate;
+  initialGrants: Array<{
+    principalType: PrincipalType;
+    principalId: string;
+    role: Role;
+  }>;
+} {
+  if (raw === undefined || raw === null) return { template: 'blank', initialGrants: [] };
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new DomainError('INVALID_REQUEST');
+  const o = raw as Record<string, unknown>;
+  const template = o.template === undefined || o.template === null ? 'blank' : o.template;
+  if (!isSectionTemplate(template)) throw new DomainError('INVALID_REQUEST');
+  const list = o.initialGrants === undefined ? [] : o.initialGrants;
+  if (!Array.isArray(list) || list.length > 8) throw new DomainError('INVALID_REQUEST');
+  const initialGrants = list.map((item) => {
+    if (typeof item !== 'object' || item === null) throw new DomainError('INVALID_REQUEST');
+    const g = item as Record<string, unknown>;
+    if (!isPrincipalType(g.principalType) || !isRole(g.role) || typeof g.principalId !== 'string') {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    const re = g.principalType === 'USER' ? ACCOUNT_ID_RE : GROUP_ID_RE;
+    if (!re.test(g.principalId)) throw new DomainError('INVALID_REQUEST');
+    return { principalType: g.principalType, principalId: g.principalId, role: g.role };
+  });
+  return { template, initialGrants };
+}
 
 function parseSitePolicy(raw: unknown): SitePolicy {
   if (typeof raw !== 'object' || raw === null) throw new DomainError('INVALID_REQUEST');

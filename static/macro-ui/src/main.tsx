@@ -5,6 +5,7 @@ import { resolveLocale, type Locale } from '@secure-sections/shared';
 import { forgeApi } from './api';
 import { Admin } from './Admin';
 import { App } from './App';
+import { Byline } from './Byline';
 import { Home } from './Home';
 import { I18nProvider } from './i18n';
 import './styles.css';
@@ -39,6 +40,8 @@ function Root() {
       <Home api={forgeApi} />
     ) : surface === 'admin' ? (
       <Admin api={forgeApi} />
+    ) : surface === 'byline' ? (
+      <Byline api={forgeApi} />
     ) : (
       <App api={forgeApi} />
     );

@@ -38,6 +38,13 @@ modules:
         function: resolver
       adfExport:
         function: adf-export
+  confluence:contentBylineItem:
+    - key: secure-sections-byline
+      resource: macro-ui
+      resolver:
+        function: resolver
+      title: Secure sections
+      tooltip: Secure sections on this page
   confluence:globalSettings:
     - key: secure-sections-admin
       resource: macro-ui

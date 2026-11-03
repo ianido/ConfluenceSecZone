@@ -1,5 +1,6 @@
 import type { RichDoc } from './editor-schema.js';
 import type { PrincipalType, Role } from './roles.js';
+import type { SectionTemplate } from './templates.js';
 
 /**
  * Typed resolver contract shared by the Custom UI and the Forge resolver.
@@ -45,6 +46,7 @@ export const RESOLVER_FUNCTIONS = [
   'getAdminOverview',
   'updateSitePolicy',
   'recoverUnowned',
+  'listPageSections',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -316,6 +318,19 @@ export interface MySections {
   activity: Array<{ at: string; action: string; actor: string; title: string | null }>;
 }
 
+export interface PageSectionRow {
+  localId: string;
+  title: string | null;
+  classification: Classification | null;
+  role: Role | null;
+}
+
+export interface InitialGrant {
+  principalType: PrincipalType;
+  principalId: string;
+  role: Role;
+}
+
 export interface AdminOverview {
   sectionCount: number;
   truncated: boolean;
@@ -349,7 +364,12 @@ export interface RetentionConfig {
 export interface RequestMap {
   getSection: { req: Record<string, never>; res: SectionView };
   createSection: {
-    req: { title?: string | null; classification?: Classification | null };
+    req: {
+      title?: string | null;
+      classification?: Classification | null;
+      template?: SectionTemplate | null;
+      initialGrants?: InitialGrant[];
+    };
     res: Result<SectionView>;
   };
   saveContent: {
@@ -450,6 +470,10 @@ export interface RequestMap {
   recoverUnowned: {
     req: { sectionId: string; newAdministratorAccountId: string; confirm: string };
     res: Result<{ recovered: true }>;
+  };
+  listPageSections: {
+    req: Record<string, never>;
+    res: Result<{ sections: PageSectionRow[] }>;
   };
 }
 

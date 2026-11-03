@@ -85,7 +85,8 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
         | 'deleteOrphan'
         | 'getAdminOverview'
         | 'updateSitePolicy'
-        | 'recoverUnowned',
+        | 'recoverUnowned'
+        | 'listPageSections',
     >(
       fn: K,
       run: (ctx: SiteContext, p: Record<string, unknown>) => Promise<unknown>,
@@ -113,7 +114,10 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
       }
     },
     createSection: guarded('createSection', (ctx, p) =>
-      service.createSection(ctx, p.title, p.classification),
+      service.createSection(ctx, p.title, p.classification, {
+        template: p.template,
+        initialGrants: p.initialGrants,
+      }),
     ),
     saveContent: guarded('saveContent', (ctx, p) =>
       service.saveContent(ctx, p.doc, p.baseVersion, p.changeNote),
@@ -193,6 +197,7 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     recoverUnowned: guardedSite('recoverUnowned', (ctx, p) =>
       service.recoverUnowned(ctx, p.sectionId, p.newAdministratorAccountId, p.confirm),
     ),
+    listPageSections: guardedSite('listPageSections', (ctx) => service.listPageSections(ctx)),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,

@@ -8,6 +8,7 @@ import {
 } from 'react';
 import {
   CLASSIFICATIONS,
+  SECTION_TEMPLATES,
   TITLE_MAX_LENGTH,
   docIsEmpty,
   isClassification,
@@ -15,7 +16,9 @@ import {
   type AccessInfo,
   type Classification,
   type ContentPayload,
+  type Role,
   type SectionMeta,
+  type SectionTemplate,
   type ProtectionFlags,
   type RichDoc,
   type SectionView,
@@ -164,6 +167,12 @@ function Unconfigured({
   const [ref, setRef] = useState('');
   const [title, setTitle] = useState('');
   const [classification, setClassification] = useState<Classification | ''>('');
+  const [template, setTemplate] = useState<SectionTemplate>('blank');
+  const [shareQuery, setShareQuery] = useState('');
+  const [shareId, setShareId] = useState('');
+  const [shareLabel, setShareLabel] = useState('');
+  const [shareRole, setShareRole] = useState<Role>('VIEW');
+  const [shareHits, setShareHits] = useState<Array<{ id: string; label: string }>>([]);
   const [error, setError] = useState<string | null>(null);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -227,6 +236,74 @@ function Unconfigured({
               </select>
             </label>
             <p className="ss-muted ss-meta-note">{t('meta.public.note')}</p>
+            <label>
+              {t('wizard.template')}
+              <select
+                value={template}
+                onChange={(e) => setTemplate(e.target.value as SectionTemplate)}
+              >
+                {SECTION_TEMPLATES.map((id) => (
+                  <option key={id} value={id}>
+                    {t(`wizard.template.${id}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('wizard.share')}
+              <input
+                value={shareQuery}
+                placeholder={t('perm.search.users')}
+                onChange={(e) => setShareQuery(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="ss-btn"
+              disabled={shareQuery.trim().length < 2}
+              onClick={() => {
+                void safeCall(api, 'searchPrincipals', { query: shareQuery, type: 'USER' }).then(
+                  (res) => {
+                    if (res.ok) {
+                      setShareHits(
+                        res.data.hits.map((h) => ({ id: h.principalId, label: h.label })),
+                      );
+                    }
+                  },
+                );
+              }}
+            >
+              {t('perm.search.users')}
+            </button>
+            <ul>
+              {shareHits.map((h) => (
+                <li key={h.id}>
+                  <button
+                    type="button"
+                    className="ss-btn"
+                    onClick={() => {
+                      setShareId(h.id);
+                      setShareLabel(h.label);
+                    }}
+                  >
+                    {h.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {shareId && (
+              <p>
+                {t('wizard.share.with', { name: shareLabel })}{' '}
+                <select
+                  aria-label={t('nav.permissions')}
+                  value={shareRole}
+                  onChange={(e) => setShareRole(e.target.value as Role)}
+                >
+                  <option value="VIEW">{t('role.VIEW')}</option>
+                  <option value="MODIFY">{t('role.MODIFY')}</option>
+                </select>
+              </p>
+            )}
           </div>
           <div className="ss-actions">
             <button
@@ -239,6 +316,18 @@ function Unconfigured({
                     await api.call('createSection', {
                       title: title.trim() === '' ? null : title.trim(),
                       classification: classification === '' ? null : classification,
+                      template,
+                      ...(shareId
+                        ? {
+                            initialGrants: [
+                              {
+                                principalType: 'USER' as const,
+                                principalId: shareId,
+                                role: shareRole,
+                              },
+                            ],
+                          }
+                        : {}),
                     }),
                   ),
                 )
