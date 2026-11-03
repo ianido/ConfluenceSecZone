@@ -472,3 +472,43 @@ describe('History panel', () => {
     expect(screen.getByText(/1 removed/)).toBeTruthy();
   });
 });
+
+describe('Protected reading', () => {
+  it('shows a deterrence watermark and records a reveal without sending the secret', async () => {
+    const api = scriptedApi({
+      getSection: () =>
+        readyView({
+          protection: {
+            watermark: true,
+            autoLockMinutes: null,
+            protectCopy: true,
+            viewerName: 'Alice',
+          },
+          content: {
+            doc: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'secret', attrs: { label: 'Password', value: 'super-secret-value' } },
+                  ],
+                },
+              ],
+            },
+            version: 1,
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            updatedBy: { accountId: 'a', displayName: 'Alice' },
+          },
+        }),
+      revealSecret: () => ({ ok: true, data: { recorded: true } }),
+    });
+    const { container } = renderWithI18n(<App api={api} />);
+    expect(await screen.findByText(/Visible to Alice/)).toBeTruthy();
+    expect(container.querySelector('.ss-protect')).not.toBeNull();
+    expect(container.textContent).not.toContain('super-secret-value');
+    await userEvent.click(screen.getByRole('button', { name: 'Reveal for 15 seconds' }));
+    expect(container.textContent).toContain('super-secret-value');
+    expect(api.calls.find((c) => c.fn === 'revealSecret')?.payload).toEqual({ label: 'Password' });
+  });
+});

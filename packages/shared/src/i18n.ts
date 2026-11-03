@@ -236,6 +236,11 @@ const en = {
   'history.compare.to': 'To version',
   'history.tag': 'Version label',
   'history.tag.save': 'Save label',
+  'protect.watermark': 'Visible to {name} · {date}',
+  'protect.locked': 'This section locked after a period of inactivity.',
+  'protect.unlock': 'Unlock',
+  'protect.note':
+    'A watermark and locked selection discourage casual copying. They do not stop someone who can already read the section.',
   'history.compare.title': 'Changes from v{from} to v{to}',
   'history.compare.empty': 'These versions look the same.',
   'history.compare.stats': '{added} added · {removed} removed',
@@ -481,6 +486,11 @@ const es: Record<MessageKey, string> = {
   'history.compare.to': 'Versión final',
   'history.tag': 'Etiqueta de versión',
   'history.tag.save': 'Guardar etiqueta',
+  'protect.watermark': 'Visible para {name} · {date}',
+  'protect.locked': 'Esta sección se bloqueó tras un periodo sin actividad.',
+  'protect.unlock': 'Desbloquear',
+  'protect.note':
+    'La marca de agua y el bloqueo de selección desalientan la copia casual. No detienen a quien ya puede leer la sección.',
   'history.compare.title': 'Cambios de v{from} a v{to}',
   'history.compare.empty': 'Estas versiones se ven iguales.',
   'history.compare.stats': '{added} añadidas · {removed} eliminadas',

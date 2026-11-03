@@ -16,6 +16,8 @@ import {
   type Classification,
   type ContentPayload,
   type SectionMeta,
+  type ProtectionFlags,
+  type RichDoc,
   type SectionView,
 } from '@secure-sections/shared';
 import { ApiError, safeCall, unwrap, type Api } from './api';
@@ -293,6 +295,74 @@ function Unconfigured({
   );
 }
 
+function ProtectedReading({
+  api,
+  doc,
+  protection,
+  onUnlock,
+}: {
+  api: Api;
+  doc: RichDoc;
+  protection: ProtectionFlags;
+  onUnlock: () => void;
+}) {
+  const t = useT();
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    if (!protection.autoLockMinutes || locked) return undefined;
+    const ms = protection.autoLockMinutes * 60_000;
+    let timer = window.setTimeout(() => setLocked(true), ms);
+    const bump = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setLocked(true), ms);
+    };
+    window.addEventListener('pointerdown', bump);
+    window.addEventListener('keydown', bump);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+    };
+  }, [locked, protection.autoLockMinutes]);
+  if (locked) {
+    return (
+      <section className="ss-card ss-warn" role="status">
+        <h2>{t('protect.locked')}</h2>
+        <button
+          type="button"
+          className="ss-btn"
+          onClick={() => {
+            setLocked(false);
+            onUnlock();
+          }}
+        >
+          {t('protect.unlock')}
+        </button>
+      </section>
+    );
+  }
+  const stamp = t('protect.watermark', {
+    name: protection.viewerName,
+    date: new Date().toLocaleDateString(),
+  });
+  return (
+    <div className={protection.protectCopy ? 'ss-reading ss-protect' : 'ss-reading'}>
+      {protection.watermark && (
+        <div className="ss-watermark" aria-hidden="true">
+          {stamp}
+        </div>
+      )}
+      <RichRenderer
+        doc={doc}
+        onRevealSecret={(label) => {
+          void api.call('revealSecret', { label });
+        }}
+      />
+      {protection.protectCopy && <p className="ss-muted">{t('protect.note')}</p>}
+    </div>
+  );
+}
+
 function Ready({
   api,
   view,
@@ -412,7 +482,12 @@ function Ready({
                   <strong>{t('state.empty.title')}</strong> {t('state.empty.body')}
                 </p>
               ) : (
-                <RichRenderer doc={content.doc} />
+                <ProtectedReading
+                  api={api}
+                  doc={content.doc}
+                  protection={view.protection}
+                  onUnlock={reload}
+                />
               )}
               <p className="ss-muted ss-saved">
                 {t('content.savedBy', {

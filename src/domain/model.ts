@@ -1,9 +1,11 @@
-import type {
-  AuditAction,
-  Classification,
-  PrincipalType,
-  RetentionConfig,
-  Role,
+import {
+  MAX_GRANT_TTL_DAYS,
+  type AuditAction,
+  type Classification,
+  type PrincipalType,
+  type RetentionConfig,
+  type Role,
+  type SitePolicy,
 } from '@secure-sections/shared';
 import type { DocKeyIndex } from '../ports/store';
 
@@ -24,6 +26,18 @@ export const LIMITS = {
 } as const;
 
 export const REQUEST_TTL_DAYS = 30;
+
+export const DEFAULT_SITE_POLICY: SitePolicy = {
+  allowRequests: true,
+  maxGrantDays: MAX_GRANT_TTL_DAYS,
+  requireChangeNote: false,
+  whoMayCreate: 'PAGE_EDITORS',
+  classes: [
+    { id: 'INTERNAL', watermark: false, autoLockMinutes: null, protectCopy: false },
+    { id: 'CONFIDENTIAL', watermark: false, autoLockMinutes: null, protectCopy: false },
+    { id: 'RESTRICTED', watermark: true, autoLockMinutes: 5, protectCopy: true },
+  ],
+};
 
 export const DEFAULT_RETENTION: RetentionConfig = {
   revisionsKeep: 50,

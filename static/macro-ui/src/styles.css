@@ -161,6 +161,30 @@ summary:focus-visible {
   padding: 16px;
   background: var(--ss-bg);
 }
+.ss-reading {
+  position: relative;
+}
+.ss-protect {
+  user-select: none;
+}
+.ss-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  opacity: 0.16;
+  transform: rotate(-18deg);
+  pointer-events: none;
+  overflow: hidden;
+}
+@media print {
+  .ss-protect {
+    display: none;
+  }
+}
 .ss-side {
   display: grid;
   grid-template-columns: 1fr 1fr;

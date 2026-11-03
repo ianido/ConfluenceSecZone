@@ -152,6 +152,7 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     setRevisionTag: guarded('setRevisionTag', (ctx, p) =>
       service.setRevisionTag(ctx, p.version, p.tag),
     ),
+    revealSecret: guarded('revealSecret', (ctx, p) => service.revealSecret(ctx, p.label)),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,

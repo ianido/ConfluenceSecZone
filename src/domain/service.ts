@@ -28,6 +28,8 @@ import {
   type SectionMeta,
   type SectionView,
   type GrantNotice,
+  type ProtectionFlags,
+  type SitePolicy,
   type UserSummary,
   type AuditAction,
   MAX_GRANT_TTL_DAYS,
@@ -53,6 +55,7 @@ import { DomainError } from './errors';
 import {
   ACCOUNT_ID_RE,
   DEFAULT_RETENTION,
+  DEFAULT_SITE_POLICY,
   GROUP_ID_RE,
   GENESIS_HASH,
   Idx,
@@ -309,6 +312,7 @@ export class SecureSectionService {
     r: BoundResolved,
     content: ContentPayload,
     notice: GrantNotice | null,
+    protection: ProtectionFlags,
   ): SectionView {
     const role = r.role.role as Role;
     return {
@@ -320,7 +324,76 @@ export class SecureSectionService {
       aclVersion: r.section.value.aclVersion,
       meta: this.metaOf(r.section.value),
       notice,
+      protection,
     };
+  }
+
+  private async readSitePolicy(): Promise<SitePolicy> {
+    const stored = await this.store.get<MetaDoc<Partial<SitePolicy>>>(
+      'meta',
+      Keys.meta('site-policy'),
+    );
+    const raw = stored?.value.value ?? {};
+    const classes = DEFAULT_SITE_POLICY.classes.map((fallback) => {
+      const found = Array.isArray(raw.classes)
+        ? raw.classes.find((c) => c?.id === fallback.id)
+        : undefined;
+      if (!found) return fallback;
+      const minutes = found.autoLockMinutes;
+      const autoLockMinutes =
+        typeof minutes === 'number' && Number.isInteger(minutes) && minutes >= 1 && minutes <= 120
+          ? minutes
+          : null;
+      return {
+        id: fallback.id,
+        watermark: found.watermark === true,
+        autoLockMinutes,
+        protectCopy: found.protectCopy === true,
+      };
+    });
+    const days = raw.maxGrantDays;
+    return {
+      allowRequests: raw.allowRequests !== false,
+      maxGrantDays:
+        typeof days === 'number' &&
+        Number.isInteger(days) &&
+        days >= 1 &&
+        days <= MAX_GRANT_TTL_DAYS
+          ? days
+          : DEFAULT_SITE_POLICY.maxGrantDays,
+      requireChangeNote: raw.requireChangeNote === true,
+      whoMayCreate: raw.whoMayCreate === 'SITE_ADMINS' ? 'SITE_ADMINS' : 'PAGE_EDITORS',
+      classes,
+    };
+  }
+
+  private async protectionFor(s: SectionDoc, accountId: string): Promise<ProtectionFlags> {
+    const policy = await this.readSitePolicy();
+    const row = s.classification
+      ? policy.classes.find((c) => c.id === s.classification)
+      : undefined;
+    const viewer = await this.userSummary(accountId);
+    return {
+      watermark: row?.watermark ?? false,
+      autoLockMinutes: row?.autoLockMinutes ?? null,
+      protectCopy: row?.protectCopy ?? false,
+      viewerName: viewer?.displayName ?? accountId,
+    };
+  }
+
+  /** Records that the caller revealed a secret field. The value is never accepted or stored. */
+  async revealSecret(ctx: TrustedContext, label: unknown): Promise<{ recorded: true }> {
+    const safeLabel = parseRevisionTag(label);
+    return this.withRetry(async () => {
+      const r = await this.requireBound(ctx, 'VIEW', { op: 'reveal', auditDenied: true });
+      const s = r.section.value;
+      const { audit, op } = this.chain(s, 'SECRET_REVEAL', ctx.accountId, {
+        ...(safeLabel ? { label: safeLabel } : {}),
+      });
+      const next: SectionDoc = { ...s, auditHead: audit.hash, updatedAt: this.nowIso() };
+      await this.store.transact([this.putSection(r.section, next), op]);
+      return { recorded: true as const };
+    });
   }
 
   private async noticeFor(s: SectionDoc, accountId: string): Promise<GrantNotice | null> {
@@ -366,7 +439,12 @@ export class SecureSectionService {
     }
     try {
       const content = await this.readHead(r.section.value);
-      return this.viewOf(r, content, await this.noticeFor(r.section.value, accountId));
+      return this.viewOf(
+        r,
+        content,
+        await this.noticeFor(r.section.value, accountId),
+        await this.protectionFor(r.section.value, accountId),
+      );
     } catch (e) {
       if (e instanceof CorruptedContentError) {
         this.logger.error('section.corrupted', { sectionId: r.section.value.sectionId });
@@ -394,6 +472,14 @@ export class SecureSectionService {
       if (r.kind === 'NO_ACCESS') throw new DomainError('DENIED');
       if (r.kind === 'BOUND') return this.viewFor(r, ctx.accountId); // idempotent: already created
       if (!r.page.canEdit) throw new DomainError('PAGE_EDIT_REQUIRED');
+      if ((await this.readSitePolicy()).whoMayCreate === 'SITE_ADMINS') {
+        try {
+          if (!(await this.gateway.isSiteAdmin(ctx.accountId))) throw new DomainError('DENIED');
+        } catch (e) {
+          if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
+          throw e;
+        }
+      }
       await this.assertPageBindingCap(ctx.pageId);
 
       const now = this.nowIso();
@@ -488,14 +574,11 @@ export class SecureSectionService {
     }
     const v = safeValidateDoc(rawDoc);
     if (!v.ok) throw new DomainError('INVALID_CONTENT');
-    return this.writeVersion(
-      ctx,
-      v.doc,
-      baseVersion,
-      null,
-      'CONTENT_EDIT',
-      parseChangeNote(rawNote),
-    );
+    const note = parseChangeNote(rawNote);
+    if ((await this.readSitePolicy()).requireChangeNote && !note) {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    return this.writeVersion(ctx, v.doc, baseVersion, null, 'CONTENT_EDIT', note);
   }
 
   private async writeVersion(
@@ -810,7 +893,15 @@ export class SecureSectionService {
     if (!isRole(input.role)) throw new DomainError('INVALID_REQUEST');
     const role = input.role;
     const expected = parseVersion(input.expectedAclVersion);
-    const expiresAt = parseExpiresAt(input.expiresAt, this.clock.now());
+    const policy = await this.readSitePolicy();
+    let cap = policy.maxGrantDays;
+    try {
+      if (await this.gateway.isSiteAdmin(ctx.accountId)) cap = MAX_GRANT_TTL_DAYS;
+    } catch (e) {
+      if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
+      throw e;
+    }
+    const expiresAt = parseExpiresAt(input.expiresAt, this.clock.now(), cap);
     await this.assertPrincipalExists(p.type, p.id);
     return this.withRetry(async () => {
       const r = await this.requireBound(ctx, 'ADMINISTER', { op: 'acl-write', auditDenied: true });
@@ -1128,6 +1219,7 @@ export class SecureSectionService {
     ctx: TrustedContext,
     input: { role: unknown; reason: unknown },
   ): Promise<AccessInfo> {
+    if (!(await this.readSitePolicy()).allowRequests) throw new DomainError('DENIED');
     if (!isRequestableRole(input.role)) throw new DomainError('INVALID_REQUEST');
     const role: RequestableRole = input.role;
     const reason = parseReason(input.reason);
@@ -1723,14 +1815,14 @@ function parseReason(v: unknown): string {
   return t;
 }
 
-function parseExpiresAt(v: unknown, now: Date): string | null {
+function parseExpiresAt(v: unknown, now: Date, maxDays = MAX_GRANT_TTL_DAYS): string | null {
   if (v === undefined || v === null || v === '') return null;
   if (typeof v !== 'string') throw new DomainError('INVALID_REQUEST');
   const t = Date.parse(v);
   if (!Number.isFinite(t) || v !== new Date(t).toISOString()) {
     throw new DomainError('INVALID_REQUEST');
   }
-  const max = now.getTime() + MAX_GRANT_TTL_DAYS * 86_400_000;
+  const max = now.getTime() + maxDays * 86_400_000;
   if (t <= now.getTime() || t > max) throw new DomainError('INVALID_REQUEST');
   return v;
 }

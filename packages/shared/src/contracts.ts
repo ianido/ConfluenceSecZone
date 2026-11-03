@@ -38,6 +38,7 @@ export const RESOLVER_FUNCTIONS = [
   'seedPageRestrictions',
   'dismissNotice',
   'setRevisionTag',
+  'revealSecret',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -154,6 +155,7 @@ export type SectionView =
       meta: SectionMeta;
       /** In-app note that this caller was granted access. Null when there is nothing to show. */
       notice: GrantNotice | null;
+      protection: ProtectionFlags;
     };
 
 export interface GrantNotice {
@@ -233,6 +235,7 @@ export type AuditAction =
   | 'ACCESS_REQUEST_APPROVE'
   | 'ACCESS_REQUEST_REJECT'
   | 'REVISION_TAG'
+  | 'SECRET_REVEAL'
   | 'ACCESS_DENIED'
   | 'RETENTION_PURGE';
 
@@ -256,6 +259,35 @@ export interface Diagnostics {
   healthy: boolean;
   checks: Array<{ name: string; status: 'OK' | 'WARN' | 'FAIL'; message: string }>;
   retention: RetentionConfig;
+}
+
+export interface ClassPolicy {
+  id: Classification;
+  watermark: boolean;
+  /** Minutes of inactivity before the reader must reload. Null disables auto-lock. */
+  autoLockMinutes: number | null;
+  protectCopy: boolean;
+}
+
+export type WhoMayCreate = 'PAGE_EDITORS' | 'SITE_ADMINS';
+
+/**
+ * Site-wide knobs. Reader protection derived from this is deterrence only:
+ * a watermark and a hidden selection do not stop a determined reader.
+ */
+export interface SitePolicy {
+  allowRequests: boolean;
+  maxGrantDays: number;
+  requireChangeNote: boolean;
+  whoMayCreate: WhoMayCreate;
+  classes: ClassPolicy[];
+}
+
+export interface ProtectionFlags {
+  watermark: boolean;
+  autoLockMinutes: number | null;
+  protectCopy: boolean;
+  viewerName: string;
 }
 
 export interface RetentionConfig {
@@ -350,6 +382,10 @@ export interface RequestMap {
   setRevisionTag: {
     req: { version: number; tag: string | null };
     res: Result<RevisionSummary>;
+  };
+  revealSecret: {
+    req: { label?: string | null };
+    res: Result<{ recorded: true }>;
   };
 }
 

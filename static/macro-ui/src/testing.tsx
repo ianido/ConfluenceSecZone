@@ -39,6 +39,12 @@ export function readyView(
     aclVersion: 1,
     meta: { title: null, classification: null, sharedWith: { users: 1, groups: 0 } },
     notice: null,
+    protection: {
+      watermark: false,
+      autoLockMinutes: null,
+      protectCopy: false,
+      viewerName: 'Alice',
+    },
     content: {
       doc: {
         type: 'doc',
