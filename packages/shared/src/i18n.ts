@@ -139,6 +139,23 @@ const en = {
   'a11y.status': 'Status',
   'ref.warning':
     'Treat this reference like a password. It cannot be used by itself to read content, but only share it with people who need to copy this section.',
+  'header.default': 'Secure section',
+  'header.shared': 'Access: {users} people · {groups} groups',
+  'header.manage': 'Manage access',
+  'class.INTERNAL': 'Internal',
+  'class.CONFIDENTIAL': 'Confidential',
+  'class.RESTRICTED': 'Restricted',
+  'meta.title.label': 'Title',
+  'meta.title.placeholder': 'For example: Q4 compensation plan',
+  'meta.class.label': 'Classification',
+  'meta.class.none': 'No classification',
+  'meta.public.note':
+    'The title and classification are visible to everyone who can view this page. Do not put confidential text in them.',
+  'meta.edit': 'Edit details',
+  'meta.saved': 'Details updated.',
+  'content.savedBy': 'Saved by {name} · {when} · v{version}',
+  'editor.words': '{count} words',
+  'editor.shortcut': 'Ctrl+S saves',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -283,6 +300,23 @@ const es: Record<MessageKey, string> = {
   'a11y.status': 'Estado',
   'ref.warning':
     'Trata esta referencia como una contraseña. Por sí sola no permite leer el contenido, pero compártela solo con quien necesite copiar esta sección.',
+  'header.default': 'Sección segura',
+  'header.shared': 'Acceso: {users} personas · {groups} grupos',
+  'header.manage': 'Gestionar acceso',
+  'class.INTERNAL': 'Interno',
+  'class.CONFIDENTIAL': 'Confidencial',
+  'class.RESTRICTED': 'Restringido',
+  'meta.title.label': 'Título',
+  'meta.title.placeholder': 'Por ejemplo: Plan de compensación Q4',
+  'meta.class.label': 'Clasificación',
+  'meta.class.none': 'Sin clasificación',
+  'meta.public.note':
+    'El título y la clasificación los ve cualquiera que pueda ver esta página. No pongas texto confidencial en ellos.',
+  'meta.edit': 'Editar detalles',
+  'meta.saved': 'Detalles actualizados.',
+  'content.savedBy': 'Guardado por {name} · {when} · v{version}',
+  'editor.words': '{count} palabras',
+  'editor.shortcut': 'Ctrl+S guarda',
 };
 
 const CATALOGS: Record<Locale, Record<MessageKey, string>> = { en, es };

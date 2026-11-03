@@ -12,14 +12,18 @@ import {
   type GrantList,
   type PrincipalHit,
   type PrincipalType,
+  type Classification,
   type RetentionConfig,
   type RevisionList,
   type RevisionSummary,
   type Role,
   type RichDoc,
+  type SectionMeta,
   type SectionView,
   type UserSummary,
   type AuditAction,
+  TITLE_MAX_LENGTH,
+  isClassification,
   isPrincipalType,
   isRole,
 } from '@secure-sections/shared';
@@ -276,6 +280,18 @@ export class SecureSectionService {
       canEditPage: r.page.canEdit,
       content,
       aclVersion: r.section.value.aclVersion,
+      meta: this.metaOf(r.section.value),
+    };
+  }
+
+  private metaOf(s: SectionDoc): SectionMeta {
+    return {
+      title: s.title ?? null,
+      classification: s.classification ?? null,
+      sharedWith: {
+        users: s.grants.filter((g) => g.principalType === 'USER').length,
+        groups: s.grants.filter((g) => g.principalType === 'GROUP').length,
+      },
     };
   }
 
@@ -302,7 +318,13 @@ export class SecureSectionService {
     return this.viewFor(await this.authz.resolve(ctx));
   }
 
-  async createSection(ctx: TrustedContext): Promise<SectionView> {
+  async createSection(
+    ctx: TrustedContext,
+    rawTitle?: unknown,
+    rawClassification?: unknown,
+  ): Promise<SectionView> {
+    const title = parseTitle(rawTitle);
+    const classification = parseClassification(rawClassification);
     return this.withRetry(async () => {
       const r = await this.authz.resolve(ctx);
       if (r.kind === 'NO_ACCESS') throw new DomainError('DENIED');
@@ -337,9 +359,12 @@ export class SecureSectionService {
         ],
         bindings: [{ pageId: ctx.pageId, localId: ctx.localId }],
         auditHead: GENESIS_HASH,
+        ...(title ? { title } : {}),
+        ...(classification ? { classification } : {}),
       };
       const { audit, op: auditOp } = this.chain(section, 'SECTION_CREATE', ctx.accountId, {
         pageId: ctx.pageId,
+        ...(classification ? { classification } : {}),
       });
       section.auditHead = audit.hash;
       const binding: BindingDoc = {
@@ -759,6 +784,32 @@ export class SecureSectionService {
     });
   }
 
+  // ---------------------------------------------------------------- metadata
+
+  /** Title and classification are visible to anyone who can view the page; ADMINISTER only. */
+  async updateMetadata(
+    ctx: TrustedContext,
+    input: { title: unknown; classification: unknown },
+  ): Promise<SectionMeta> {
+    const title = parseTitle(input.title);
+    const classification = parseClassification(input.classification);
+    return this.withRetry(async () => {
+      const r = await this.requireBound(ctx, 'ADMINISTER', { op: 'metadata', auditDenied: true });
+      const s = r.section.value;
+      if ((s.title ?? null) === title && (s.classification ?? null) === classification) {
+        return this.metaOf(s);
+      }
+      const next: SectionDoc = { ...s, title, classification, updatedAt: this.nowIso() };
+      const { audit, op } = this.chain(s, 'METADATA_UPDATE', ctx.accountId, {
+        titleSet: title !== null,
+        classification,
+      });
+      next.auditHead = audit.hash;
+      await this.store.transact([this.putSection(r.section, next), op]);
+      return this.metaOf(next);
+    });
+  }
+
   // ---------------------------------------------------------------- audit
 
   async listAudit(ctx: TrustedContext, cursor: unknown): Promise<AuditList> {
@@ -1125,6 +1176,31 @@ export class SecureSectionService {
 }
 
 export { validateDoc };
+
+function hasControlChars(t: string): boolean {
+  for (let i = 0; i < t.length; i += 1) {
+    const c = t.charCodeAt(i);
+    if (c < 0x20 || c === 0x7f || c === 0x2028 || c === 0x2029) return true;
+  }
+  return false;
+}
+
+function parseTitle(v: unknown): string | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'string') throw new DomainError('INVALID_REQUEST');
+  const t = v.trim();
+  if (t === '') return null;
+  if (t.length > TITLE_MAX_LENGTH || hasControlChars(t)) {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  return t;
+}
+
+function parseClassification(v: unknown): Classification | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (!isClassification(v)) throw new DomainError('INVALID_REQUEST');
+  return v;
+}
 
 function parseVersion(v: unknown): number {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1)

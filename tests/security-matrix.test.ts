@@ -42,6 +42,7 @@ describe('resolver surface: every function denies unauthorised callers and leaks
     recoverSection: { newAdministratorAccountId: 'mallory', confirm: true },
     bindHere: { sectionRef: 'x' },
     copyHere: { sourceRef: 'x' },
+    updateMetadata: { title: 'hijack', classification: 'RESTRICTED' },
   };
 
   for (const fn of RESOLVER_FUNCTIONS.filter((f) => f !== 'createSection')) {

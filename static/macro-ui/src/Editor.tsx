@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
@@ -17,6 +25,47 @@ interface Props {
   initial: ContentPayload;
   onSaved: (c: ContentPayload) => void;
   onCancel: () => void;
+}
+
+function Icon({ children }: { children: ReactNode }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {children}
+    </svg>
+  );
+}
+
+const ICONS = {
+  bold: <path d="M7 4h7a4 4 0 010 8H7zM7 12h8a4 4 0 010 8H7z" />,
+  italic: <path d="M14 4h6M4 20h6M15 4L9 20" />,
+  strike: <path d="M4 12h16M16 6c0-2-2-3-4-3S8 4 8 6s2 3 4 3M8 18c0 2 2 3 4 3s4-1 4-3" />,
+  code: <path d="M8 6L2 12l6 6M16 6l6 6-6 6" />,
+  bullets: (
+    <>
+      <path d="M9 6h12M9 12h12M9 18h12" />
+      <circle cx="4" cy="6" r="1" />
+      <circle cx="4" cy="12" r="1" />
+      <circle cx="4" cy="18" r="1" />
+    </>
+  ),
+  numbers: <path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 18h2M4 14h2l-2 2.5V18" />,
+  link: (
+    <path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.5 1.5M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19" />
+  ),
+  table: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="1" />
+      <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+    </>
+  ),
+  rule: <path d="M4 12h16" />,
+  undo: <path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" />,
+  redo: <path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3" />,
+} as const;
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === '' ? 0 : trimmed.split(/\s+/).length;
 }
 
 function extensions() {
@@ -47,6 +96,7 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
   const [conflict, setConflict] = useState<ContentPayload | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const initialJson = useRef(JSON.stringify(initial.doc));
+  const [words, setWords] = useState(0);
 
   const exts = useMemo(extensions, []);
   const editor = useEditor({
@@ -61,7 +111,11 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
         'aria-label': t('editor.label'),
       },
     },
-    onUpdate: ({ editor: e }) => setDirty(JSON.stringify(e.getJSON()) !== initialJson.current),
+    onCreate: ({ editor: e }) => setWords(countWords(e.state.doc.textContent)),
+    onUpdate: ({ editor: e }) => {
+      setDirty(JSON.stringify(e.getJSON()) !== initialJson.current);
+      setWords(countWords(e.state.doc.textContent));
+    },
   });
 
   useEffect(() => {
@@ -117,8 +171,17 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
     onCancel();
   };
 
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (dirty && !saving) void save();
+    }
+  };
+
   return (
-    <section aria-label={t('editor.label')} className="ss-edit">
+    // The handler only adds a Ctrl+S shortcut; every action stays reachable through buttons.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <section aria-label={t('editor.label')} className="ss-edit" onKeyDown={onKeyDown}>
       {editor && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
       <div className="ss-actions">
@@ -134,6 +197,10 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
           {t('action.cancel')}
         </button>
         {dirty && !saving && <span className="ss-muted">{t('editor.unsaved')}</span>}
+      </div>
+      <div className="ss-statusbar ss-muted">
+        <span>{t('editor.words', { count: words })}</span>
+        <span>{t('editor.shortcut')}</span>
       </div>
       {confirmDiscard && (
         <div role="alertdialog" aria-label={t('editor.leaveGuard')} className="ss-callout ss-warn">
@@ -193,7 +260,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   const [linkInput, setLinkInput] = useState<string | null>(null);
   const [linkError, setLinkError] = useState(false);
 
-  const btn = (label: string, active: boolean, run: () => void, glyph: string) => (
+  const btn = (label: string, active: boolean, run: () => void, glyph: ReactNode) => (
     <button
       type="button"
       className="ss-tool"
@@ -209,10 +276,30 @@ function Toolbar({ editor }: { editor: Editor }) {
 
   return (
     <div role="toolbar" aria-label={t('editor.label')} className="ss-toolbar">
-      {btn(t('toolbar.bold'), editor.isActive('bold'), () => chain().toggleBold().run(), 'B')}
-      {btn(t('toolbar.italic'), editor.isActive('italic'), () => chain().toggleItalic().run(), 'I')}
-      {btn(t('toolbar.strike'), editor.isActive('strike'), () => chain().toggleStrike().run(), 'S')}
-      {btn(t('toolbar.code'), editor.isActive('code'), () => chain().toggleCode().run(), '</>')}
+      {btn(
+        t('toolbar.bold'),
+        editor.isActive('bold'),
+        () => chain().toggleBold().run(),
+        <Icon>{ICONS.bold}</Icon>,
+      )}
+      {btn(
+        t('toolbar.italic'),
+        editor.isActive('italic'),
+        () => chain().toggleItalic().run(),
+        <Icon>{ICONS.italic}</Icon>,
+      )}
+      {btn(
+        t('toolbar.strike'),
+        editor.isActive('strike'),
+        () => chain().toggleStrike().run(),
+        <Icon>{ICONS.strike}</Icon>,
+      )}
+      {btn(
+        t('toolbar.code'),
+        editor.isActive('code'),
+        () => chain().toggleCode().run(),
+        <Icon>{ICONS.code}</Icon>,
+      )}
       {btn(
         t('toolbar.h2'),
         editor.isActive('heading', { level: 2 }),
@@ -229,13 +316,13 @@ function Toolbar({ editor }: { editor: Editor }) {
         t('toolbar.bullets'),
         editor.isActive('bulletList'),
         () => chain().toggleBulletList().run(),
-        '•',
+        <Icon>{ICONS.bullets}</Icon>,
       )}
       {btn(
         t('toolbar.numbers'),
         editor.isActive('orderedList'),
         () => chain().toggleOrderedList().run(),
-        '1.',
+        <Icon>{ICONS.numbers}</Icon>,
       )}
       {btn(
         t('toolbar.quote'),
@@ -253,17 +340,22 @@ function Toolbar({ editor }: { editor: Editor }) {
         t('toolbar.link'),
         editor.isActive('link'),
         () => setLinkInput(editor.getAttributes('link').href ?? ''),
-        '🔗',
+        <Icon>{ICONS.link}</Icon>,
       )}
       {btn(
         t('toolbar.table'),
         editor.isActive('table'),
         () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-        '▦',
+        <Icon>{ICONS.table}</Icon>,
       )}
-      {btn(t('toolbar.rule'), false, () => chain().setHorizontalRule().run(), '—')}
-      {btn(t('toolbar.undo'), false, () => chain().undo().run(), '↶')}
-      {btn(t('toolbar.redo'), false, () => chain().redo().run(), '↷')}
+      {btn(
+        t('toolbar.rule'),
+        false,
+        () => chain().setHorizontalRule().run(),
+        <Icon>{ICONS.rule}</Icon>,
+      )}
+      {btn(t('toolbar.undo'), false, () => chain().undo().run(), <Icon>{ICONS.undo}</Icon>)}
+      {btn(t('toolbar.redo'), false, () => chain().redo().run(), <Icon>{ICONS.redo}</Icon>)}
       {linkInput !== null && (
         <form
           className="ss-link-form"

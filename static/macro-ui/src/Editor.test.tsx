@@ -34,6 +34,30 @@ describe('EditPanel', () => {
     expect(Object.keys(call?.payload as object).sort()).toEqual(['baseVersion', 'doc']);
   });
 
+  it('shows a word count and saves with Ctrl+S only when there are changes', async () => {
+    const saved = vi.fn();
+    const api = scriptedApi({
+      saveContent: (p) => ({
+        ok: true,
+        data: {
+          content: { ...initial, doc: (p as { doc: ContentPayload['doc'] }).doc, version: 2 },
+        },
+      }),
+    });
+    renderWithI18n(<EditPanel api={api} initial={initial} onSaved={saved} onCancel={() => {}} />);
+    await screen.findByRole('button', { name: 'Save' });
+    expect(await screen.findByText('2 words')).toBeTruthy();
+
+    screen.getByRole('textbox').focus();
+    await userEvent.keyboard('{Control>}s{/Control}');
+    expect(api.calls.filter((c) => c.fn === 'saveContent')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: hrLabel }));
+    await userEvent.keyboard('{Control>}s{/Control}');
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(api.calls.filter((c) => c.fn === 'saveContent')).toHaveLength(1);
+  });
+
   it('conflict: shows latest-version choices instead of silently overwriting', async () => {
     const api = scriptedApi({
       saveContent: () => ({ ok: false, code: 'CONFLICT' }),

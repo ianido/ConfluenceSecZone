@@ -84,7 +84,9 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
         return f.code === 'DENIED' ? { state: 'DENIED' } : { state: 'UNAVAILABLE' };
       }
     },
-    createSection: guarded('createSection', (ctx) => service.createSection(ctx)),
+    createSection: guarded('createSection', (ctx, p) =>
+      service.createSection(ctx, p.title, p.classification),
+    ),
     saveContent: guarded('saveContent', (ctx, p) => service.saveContent(ctx, p.doc, p.baseVersion)),
     listRevisions: guarded('listRevisions', (ctx, p) => service.listRevisions(ctx, p.cursor)),
     getRevision: guarded('getRevision', (ctx, p) => service.getRevision(ctx, p.version)),
@@ -120,6 +122,9 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     copyHere: guarded('copyHere', (ctx, p) => service.copyHere(ctx, p.sourceRef)),
     deleteSection: guarded('deleteSection', (ctx, p) => service.deleteSection(ctx, p.confirm)),
     getDiagnostics: guarded('getDiagnostics', (ctx) => service.getDiagnostics(ctx)),
+    updateMetadata: guarded('updateMetadata', (ctx, p) =>
+      service.updateMetadata(ctx, { title: p.title, classification: p.classification }),
+    ),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,

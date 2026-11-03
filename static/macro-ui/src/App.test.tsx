@@ -149,6 +149,75 @@ describe('App states', () => {
   });
 });
 
+describe('Section header', () => {
+  it('shows title, classification, access summary and saved status', async () => {
+    const api = scriptedApi({
+      getSection: () =>
+        readyView({
+          meta: {
+            title: 'Q4 plan',
+            classification: 'CONFIDENTIAL',
+            sharedWith: { users: 3, groups: 1 },
+          },
+        }),
+    });
+    const { container } = renderWithI18n(<App api={api} />);
+    expect(await screen.findByRole('heading', { name: /Q4 plan/ })).toBeTruthy();
+    expect(screen.getByText('Confidential')).toBeTruthy();
+    expect(screen.getByText('Access: 3 people · 1 groups')).toBeTruthy();
+    expect(screen.getByText(/Saved by Alice/)).toBeTruthy();
+    await expectNoA11yViolations(container);
+  });
+
+  it('only administrators can edit details; saving sends only title and classification', async () => {
+    const api = scriptedApi({
+      getSection: () => readyView(),
+      updateMetadata: (p) => ({
+        ok: true,
+        data: { ...(p as object), sharedWith: { users: 1, groups: 0 } },
+      }),
+    });
+    renderWithI18n(<App api={api} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit details' }));
+    await userEvent.type(screen.getByLabelText('Title'), 'Board notes');
+    await userEvent.selectOptions(screen.getByLabelText('Classification'), 'RESTRICTED');
+    expect(screen.getByText(/visible to everyone who can view this page/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('heading', { name: /Board notes/ })).toBeTruthy();
+    expect(screen.getByText('Restricted')).toBeTruthy();
+    const call = api.calls.find((c) => c.fn === 'updateMetadata');
+    expect(call?.payload).toEqual({ title: 'Board notes', classification: 'RESTRICTED' });
+  });
+
+  it('non-administrators get no edit or manage controls', async () => {
+    const api = scriptedApi({ getSection: () => readyView({ role: 'VIEW', canWrite: false }) });
+    renderWithI18n(<App api={api} />);
+    await screen.findByText('Quarterly numbers');
+    expect(screen.queryByRole('button', { name: 'Edit details' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Manage access' })).toBeNull();
+  });
+
+  it('wizard sends the chosen title and classification', async () => {
+    let created = false;
+    const api = scriptedApi({
+      getSection: () => (created ? readyView() : { state: 'UNCONFIGURED', canCreate: true }),
+      createSection: () => {
+        created = true;
+        return { ok: true, data: readyView() };
+      },
+    });
+    renderWithI18n(<App api={api} />);
+    await userEvent.type(await screen.findByLabelText('Title'), 'HR memo');
+    await userEvent.selectOptions(screen.getByLabelText('Classification'), 'INTERNAL');
+    await userEvent.click(screen.getByRole('button', { name: 'Set up secure section' }));
+    await screen.findByText('Quarterly numbers');
+    expect(api.calls.find((c) => c.fn === 'createSection')?.payload).toEqual({
+      title: 'HR memo',
+      classification: 'INTERNAL',
+    });
+  });
+});
+
 describe('Permissions panel', () => {
   const grants = {
     ok: true,

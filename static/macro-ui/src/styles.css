@@ -297,3 +297,84 @@ select {
     transition: none !important;
   }
 }
+
+.ss-header {
+  padding: 10px 16px 0;
+  border-bottom: 1px solid var(--ss-border);
+  background: var(--ss-bg-raised);
+  border-radius: 6px 6px 0 0;
+}
+.ss-header-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-bottom: 8px;
+}
+.ss-header-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.ss-header-spacer {
+  flex: 1;
+}
+.ss-header-shared {
+  font-size: 12px;
+}
+.ss-small {
+  min-height: 26px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.ss-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  border: 1px solid var(--ss-border);
+}
+.ss-class-confidential,
+.ss-class-restricted {
+  color: var(--ss-danger);
+  border-color: var(--ss-danger);
+}
+.ss-class-internal {
+  color: var(--ss-muted);
+}
+.ss-meta-form {
+  display: grid;
+  gap: 8px;
+  max-width: 480px;
+  padding-bottom: 8px;
+}
+.ss-meta-note {
+  margin: 0;
+  font-size: 12px;
+}
+.ss-saved {
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.ss-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.ss-tool svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+}

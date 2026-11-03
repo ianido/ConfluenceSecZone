@@ -7,13 +7,19 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  CLASSIFICATIONS,
+  TITLE_MAX_LENGTH,
   docIsEmpty,
+  isClassification,
   roleAtLeast,
+  type Classification,
   type ContentPayload,
+  type SectionMeta,
   type SectionView,
 } from '@secure-sections/shared';
 import { ApiError, safeCall, unwrap, type Api } from './api';
 import { EditPanel } from './Editor';
+import { SectionHeader } from './Header';
 import { useT } from './i18n';
 import { AuditPanel, HelpPanel, HistoryPanel, PermissionsPanel } from './Panels';
 import { RichRenderer } from './Renderer';
@@ -136,6 +142,8 @@ function Unconfigured({
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<'none' | 'bind' | 'copy'>('none');
   const [ref, setRef] = useState('');
+  const [title, setTitle] = useState('');
+  const [classification, setClassification] = useState<Classification | ''>('');
   const [error, setError] = useState<string | null>(null);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -170,12 +178,51 @@ function Unconfigured({
             <li>{t('wizard.step3')}</li>
           </ol>
           <p className="ss-muted">{t('wizard.copyWarning')}</p>
+          <div className="ss-meta-form">
+            <label>
+              {t('meta.title.label')}
+              <input
+                value={title}
+                maxLength={TITLE_MAX_LENGTH}
+                placeholder={t('meta.title.placeholder')}
+                onChange={(e) => setTitle(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              {t('meta.class.label')}
+              <select
+                value={classification}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setClassification(isClassification(v) ? v : '');
+                }}
+              >
+                <option value="">{t('meta.class.none')}</option>
+                {CLASSIFICATIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {t(`class.${c}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="ss-muted ss-meta-note">{t('meta.public.note')}</p>
+          </div>
           <div className="ss-actions">
             <button
               type="button"
               className="ss-btn ss-primary"
               disabled={busy}
-              onClick={() => run(async () => unwrap(await api.call('createSection', {})))}
+              onClick={() =>
+                run(async () =>
+                  unwrap(
+                    await api.call('createSection', {
+                      title: title.trim() === '' ? null : title.trim(),
+                      classification: classification === '' ? null : classification,
+                    }),
+                  ),
+                )
+              }
             >
               {t('action.create')}
             </button>
@@ -240,6 +287,7 @@ function Ready({
   const t = useT();
   const [tab, setTab] = useState<Tab>('content');
   const [content, setContent] = useState<ContentPayload>(view.content);
+  const [meta, setMeta] = useState<SectionMeta>(view.meta);
   const [editing, setEditing] = useState(false);
   const tabs: Tab[] = ['content'];
   if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('permissions');
@@ -248,6 +296,7 @@ function Ready({
   tabs.push('help');
 
   useEffect(() => setContent(view.content), [view.content]);
+  useEffect(() => setMeta(view.meta), [view.meta]);
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, idx: number) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -258,6 +307,14 @@ function Ready({
 
   return (
     <div className="ss-shell">
+      <SectionHeader
+        api={api}
+        meta={meta}
+        canAdminister={roleAtLeast(view.role, 'ADMINISTER')}
+        editingLocked={editing}
+        onMeta={setMeta}
+        onManage={() => setTab('permissions')}
+      />
       <div role="tablist" aria-label={t('app.title')} className="ss-tabs">
         {tabs.map((id, i) => (
           <button
@@ -299,6 +356,13 @@ function Ready({
               ) : (
                 <RichRenderer doc={content.doc} />
               )}
+              <p className="ss-muted ss-saved">
+                {t('content.savedBy', {
+                  name: content.updatedBy?.displayName ?? '—',
+                  when: new Date(content.updatedAt).toLocaleString(),
+                  version: content.version,
+                })}
+              </p>
               <div className="ss-actions">
                 {view.canWrite && (
                   <button

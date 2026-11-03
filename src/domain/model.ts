@@ -1,4 +1,10 @@
-import type { AuditAction, PrincipalType, RetentionConfig, Role } from '@secure-sections/shared';
+import type {
+  AuditAction,
+  Classification,
+  PrincipalType,
+  RetentionConfig,
+  Role,
+} from '@secure-sections/shared';
 import type { DocKeyIndex } from '../ports/store';
 
 export const SCHEMA_VERSION = 1;
@@ -51,6 +57,9 @@ export interface SectionDoc {
   grants: GrantRec[];
   bindings: BindingRef[];
   auditHead: string;
+  /** Optional descriptive metadata; absent on sections created before it existed. */
+  title?: string | null;
+  classification?: Classification | null;
 }
 
 export interface BindingDoc {

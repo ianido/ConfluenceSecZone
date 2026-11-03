@@ -28,6 +28,7 @@ export const RESOLVER_FUNCTIONS = [
   'deleteSection',
   'getDiagnostics',
   'recoverSection',
+  'updateMetadata',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -68,6 +69,26 @@ export interface PageCapabilities {
   canEditPage: boolean;
 }
 
+export const CLASSIFICATIONS = ['INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as const;
+export type Classification = (typeof CLASSIFICATIONS)[number];
+
+export function isClassification(value: unknown): value is Classification {
+  return typeof value === 'string' && (CLASSIFICATIONS as readonly string[]).includes(value);
+}
+
+export const TITLE_MAX_LENGTH = 80;
+
+/**
+ * Descriptive metadata of a section. The title and classification are deliberately NOT secret:
+ * they are visible to everyone who can view the page (see docs/SECURITY.md). Never put
+ * confidential text in them.
+ */
+export interface SectionMeta {
+  title: string | null;
+  classification: Classification | null;
+  sharedWith: { users: number; groups: number };
+}
+
 export type SectionView =
   | { state: 'UNCONFIGURED'; canCreate: boolean }
   | { state: 'DENIED' }
@@ -80,6 +101,7 @@ export type SectionView =
       canEditPage: boolean;
       content: ContentPayload;
       aclVersion: number;
+      meta: SectionMeta;
     };
 
 export interface EffectiveAccess {
@@ -136,6 +158,7 @@ export type AuditAction =
   | 'SECTION_COPY'
   | 'SECTION_DELETE'
   | 'ADMIN_RECOVERY'
+  | 'METADATA_UPDATE'
   | 'ACCESS_DENIED'
   | 'RETENTION_PURGE';
 
@@ -170,7 +193,10 @@ export interface RetentionConfig {
 
 export interface RequestMap {
   getSection: { req: Record<string, never>; res: SectionView };
-  createSection: { req: Record<string, never>; res: Result<SectionView> };
+  createSection: {
+    req: { title?: string | null; classification?: Classification | null };
+    res: Result<SectionView>;
+  };
   saveContent: {
     req: { doc: unknown; baseVersion: number };
     res: Result<{ content: ContentPayload }>;
@@ -216,6 +242,10 @@ export interface RequestMap {
   recoverSection: {
     req: { newAdministratorAccountId: string; confirm: string };
     res: Result<{ recovered: true }>;
+  };
+  updateMetadata: {
+    req: { title: string | null; classification: Classification | null };
+    res: Result<SectionMeta>;
   };
 }
 
