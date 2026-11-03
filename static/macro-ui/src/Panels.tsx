@@ -17,6 +17,7 @@ import { RequestsQueue } from './Access';
 import { ApiError, safeCall, unwrap, type Api } from './api';
 import { useT } from './i18n';
 import { RichRenderer } from './Renderer';
+import { Avatar, Pill } from './visual';
 
 function useLoad<T>(load: () => Promise<T>): {
   data: T | null;
@@ -217,11 +218,19 @@ export function PermissionsPanel({
           {list.grants.map((g) => (
             <tr key={`${g.principalType}:${g.principalId}`}>
               <td>
-                {g.label}{' '}
-                <span className="ss-chip">
-                  {g.principalType === 'USER' ? t('perm.user') : t('perm.group')}
+                <span className="ss-who">
+                  <Avatar name={g.label} />
+                  <span>
+                    {g.label}{' '}
+                    <Pill tone={g.principalType === 'GROUP' ? 'group' : 'muted'}>
+                      {g.principalType === 'USER' ? t('perm.user') : t('perm.group')}
+                    </Pill>
+                    {g.principalType === 'USER' && g.principalId === list.ownerAccountId && (
+                      <Pill tone="owner">{t('perm.owner')}</Pill>
+                    )}
+                    {!g.active && <Pill tone="danger">{t('perm.inactive')}</Pill>}
+                  </span>
                 </span>
-                {!g.active && <span className="ss-chip ss-chip-warn">{t('perm.inactive')}</span>}
               </td>
               <td>
                 <select
@@ -248,13 +257,13 @@ export function PermissionsPanel({
               <td>
                 {g.expiresAt ? (
                   Date.parse(g.expiresAt) > Date.now() ? (
-                    <span>{new Date(g.expiresAt).toLocaleDateString()}</span>
+                    <Pill tone="warn">{new Date(g.expiresAt).toLocaleDateString()}</Pill>
                   ) : (
-                    <span className="ss-err">
+                    <Pill tone="danger">
                       {t('perm.expires.expired', {
                         when: new Date(g.expiresAt).toLocaleDateString(),
                       })}
-                    </span>
+                    </Pill>
                   )
                 ) : (
                   <span className="ss-muted">{t('perm.expires.never')}</span>
@@ -569,6 +578,7 @@ export function HistoryPanel({
   if (hist.error || !hist.data)
     return <ErrorBox error={hist.error ?? new ApiError('UNAVAILABLE')} onRetry={hist.reload} />;
   const fmt = (iso: string) => new Date(iso).toLocaleString();
+  const current = hist.data.revisions.reduce((max, r) => Math.max(max, r.version), 0);
   const openCompare = async (from: number, to: number) => {
     const [a, b] = await Promise.all([
       safeCall(api, 'getRevision', { version: from }),
@@ -639,12 +649,19 @@ export function HistoryPanel({
       )}
       <ol className="ss-history">
         {hist.data.revisions.map((r) => (
-          <li key={r.version}>
-            <span>
-              v{r.version} · {fmt(r.createdAt)} · {r.author?.displayName ?? '—'}
+          <li
+            key={r.version}
+            className={r.version === current ? 'ss-version is-current' : 'ss-version'}
+          >
+            <div className="ss-version-head">
+              <strong>v{r.version}</strong>
+              {r.version === current && <Pill tone="ok">{t('history.current')}</Pill>}
+              {r.tag && <Pill tone="warn">{r.tag}</Pill>}
+            </div>
+            <span className="ss-muted">
+              {r.author?.displayName ?? '—'} · {fmt(r.createdAt)}
               {r.restoredFrom ? ` · ↩ v${r.restoredFrom}` : ''}
               {r.changeNote ? ` · ${r.changeNote}` : ''}
-              {r.tag ? ` · ${r.tag}` : ''}
             </span>
             {canWrite && (
               <form

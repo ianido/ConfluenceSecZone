@@ -10,6 +10,7 @@ import {
 import { ApiError, safeCall, unwrap, type Api } from './api';
 import { ClassificationBadge } from './Header';
 import { useT } from './i18n';
+import { Avatar, AvatarStack, HourglassIcon, LockIcon } from './visual';
 
 /** Shown to page viewers without a grant: public details, whom to ask, and the request form. */
 export function AccessRequestBox({
@@ -48,19 +49,22 @@ export function AccessRequestBox({
   return (
     <div className="ss-access">
       {(info.title || info.classification) && (
-        <p className="ss-access-title">
+        <p className="ss-access-title ss-denied-title">
+          <LockIcon />
           {info.title && <strong>{info.title}</strong>}{' '}
           <ClassificationBadge value={info.classification} />
         </p>
       )}
       {info.administrators.length > 0 && (
-        <p className="ss-muted">
+        <p className="ss-muted ss-shared">
+          <AvatarStack names={info.administrators.map((a) => a.displayName)} />
           {t('access.admins', { names: info.administrators.map((a) => a.displayName).join(', ') })}
         </p>
       )}
       {info.myRequest ? (
-        <div className="ss-callout" role="status">
-          <p>
+        <div className="ss-callout ss-warn" role="status">
+          <p className="ss-denied-title">
+            <HourglassIcon />
             {t('access.pending', {
               role: t(`role.${info.myRequest.role}`),
               when: new Date(info.myRequest.requestedAt).toLocaleString(),
@@ -101,36 +105,38 @@ export function AccessRequestBox({
           }}
         >
           <h3>{t('access.request.title')}</h3>
-          <label>
-            {t('access.request.level')}
-            <select
-              value={role}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (isRequestableRole(v)) setRole(v);
-              }}
-            >
-              {REQUESTABLE_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {t(`role.${r}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t('access.request.reason')}
-            <input
-              value={reason}
-              maxLength={REQUEST_REASON_MAX_LENGTH}
-              placeholder={t('access.request.reasonPlaceholder')}
-              onChange={(e) => setReason(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
+          <div className="ss-request-fields">
+            <label>
+              {t('access.request.level')}
+              <select
+                value={role}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (isRequestableRole(v)) setRole(v);
+                }}
+              >
+                {REQUESTABLE_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {t(`role.${r}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('access.request.reason')}
+              <input
+                value={reason}
+                maxLength={REQUEST_REASON_MAX_LENGTH}
+                placeholder={t('access.request.reasonPlaceholder')}
+                onChange={(e) => setReason(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <button type="submit" className="ss-btn ss-primary" disabled={busy}>
+              {t('access.request.send')}
+            </button>
+          </div>
           <p className="ss-muted ss-meta-note">{t('access.request.note')}</p>
-          <button type="submit" className="ss-btn ss-primary" disabled={busy}>
-            {t('access.request.send')}
-          </button>
         </form>
       )}
       <div role="status" aria-live="polite">
@@ -213,13 +219,18 @@ export function RequestsQueue({
       <ul className="ss-requests">
         {list.requests.map((r) => (
           <li key={r.accountId}>
-            <span>
-              <strong>
-                {t('requests.wants', { name: r.displayName, role: t(`role.${r.role}`) })}
-              </strong>
-              <br />
-              <span className="ss-muted">{r.reason || t('requests.noReason')}</span>
-              {!r.active && <span className="ss-chip ss-chip-warn">{t('requests.inactive')}</span>}
+            <span className="ss-who">
+              <Avatar name={r.displayName} />
+              <span>
+                <strong>
+                  {t('requests.wants', { name: r.displayName, role: t(`role.${r.role}`) })}
+                </strong>
+                <br />
+                <span className="ss-muted">{r.reason || t('requests.noReason')}</span>
+                {!r.active && (
+                  <span className="ss-chip ss-chip-warn">{t('requests.inactive')}</span>
+                )}
+              </span>
             </span>
             <span className="ss-actions">
               <button

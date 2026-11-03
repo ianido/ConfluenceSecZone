@@ -198,6 +198,7 @@ const en = {
   'perm.add': 'Add access',
   'perm.user': 'Person',
   'perm.group': 'Group',
+  'perm.owner': 'Owner',
   'perm.inactive': 'Unavailable account or group',
   'perm.confirm.admin':
     'Give administrator access? Administrators can change who can read this content.',
@@ -337,6 +338,7 @@ const en = {
   'history.compare.to': 'To version',
   'history.tag': 'Version label',
   'history.tag.save': 'Save label',
+  'history.current': 'Current',
   'protect.watermark': 'Visible to {name} · {date}',
   'protect.locked': 'This section locked after a period of inactivity.',
   'protect.locked.initial': 'This section is locked. Unlock it to read the content.',
@@ -550,6 +552,7 @@ const es: Record<MessageKey, string> = {
   'perm.add': 'Añadir acceso',
   'perm.user': 'Persona',
   'perm.group': 'Grupo',
+  'perm.owner': 'Propietario',
   'perm.inactive': 'Cuenta o grupo no disponible',
   'perm.confirm.admin':
     '¿Dar acceso de administrador? Los administradores pueden cambiar quién puede leer este contenido.',
@@ -690,6 +693,7 @@ const es: Record<MessageKey, string> = {
   'history.compare.to': 'Versión final',
   'history.tag': 'Etiqueta de versión',
   'history.tag.save': 'Guardar etiqueta',
+  'history.current': 'Actual',
   'protect.watermark': 'Visible para {name} · {date}',
   'protect.locked': 'Esta sección se bloqueó tras un periodo sin actividad.',
   'protect.locked.initial': 'Esta sección está bloqueada. Desbloquéala para leer el contenido.',

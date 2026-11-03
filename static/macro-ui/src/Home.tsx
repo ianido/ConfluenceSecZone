@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Classification, MySections } from '@secure-sections/shared';
 import { CLASSIFICATIONS } from '@secure-sections/shared';
 import { safeCall, unwrap, type Api } from './api';
+import { ClassificationBadge } from './Header';
 import { useT } from './i18n';
+import { CountFaces, LockIcon, Pill } from './visual';
 
 export function Home({ api }: { api: Api }) {
   const t = useT();
@@ -69,11 +71,18 @@ export function Home({ api }: { api: Api }) {
 
   return (
     <main className="ss-shell">
-      <h1>{t('home.title')}</h1>
+      <header className="ss-page-head">
+        <h1>
+          <LockIcon /> {t('home.title')}
+        </h1>
+        <button type="button" className="ss-btn" onClick={() => void download()}>
+          {t('home.export')}
+        </button>
+      </header>
       <div className="ss-kpis">
         <Kpi label={t('home.kpi.admin')} value={data.kpis.administered} />
-        <Kpi label={t('home.kpi.pending')} value={data.kpis.pendingRequests} />
-        <Kpi label={t('home.kpi.expiring')} value={data.kpis.expiringGrants} />
+        <Kpi label={t('home.kpi.pending')} value={data.kpis.pendingRequests} tone="warn" />
+        <Kpi label={t('home.kpi.expiring')} value={data.kpis.expiringGrants} tone="info" />
         <Kpi label={t('home.kpi.inactive')} value={data.kpis.inactive} />
       </div>
       <form className="ss-row" onSubmit={(e) => e.preventDefault()}>
@@ -100,9 +109,6 @@ export function Home({ api }: { api: Api }) {
           />{' '}
           {t('home.orphansOnly')}
         </label>
-        <button type="button" className="ss-btn" onClick={() => void download()}>
-          {t('home.export')}
-        </button>
       </form>
       <table className="ss-grid">
         <thead>
@@ -119,16 +125,35 @@ export function Home({ api }: { api: Api }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.sectionId}>
-              <td>{r.title ?? t('home.untitled')}</td>
+              <td>
+                <strong>{r.title ?? t('home.untitled')}</strong>
+              </td>
               <td>{r.pageId}</td>
               <td>{r.spaceKey ?? '—'}</td>
-              <td>{r.classification ? t(`class.${r.classification}`) : '—'}</td>
+              <td>{r.classification ? <ClassificationBadge value={r.classification} /> : '—'}</td>
               <td>
-                {t(`role.${r.role}`)} · {r.sharedUsers}
+                <span className="ss-shared">
+                  <CountFaces users={r.sharedUsers} groups={0} />
+                  {t(`role.${r.role}`)}
+                </span>
               </td>
               <td>{new Date(r.updatedAt).toLocaleString()}</td>
               <td>
-                {r.pageStatus === 'MISSING' ? t('home.orphan') : t('home.ok')}
+                <Pill
+                  tone={
+                    r.pageStatus === 'MISSING'
+                      ? 'muted'
+                      : r.pageStatus === 'UNKNOWN'
+                        ? 'warn'
+                        : 'ok'
+                  }
+                >
+                  {r.pageStatus === 'MISSING'
+                    ? t('home.orphan')
+                    : r.pageStatus === 'UNKNOWN'
+                      ? t('state.unavailable.title')
+                      : t('home.ok')}
+                </Pill>
                 {r.pageStatus === 'MISSING' && r.role === 'ADMINISTER' && (
                   <button
                     type="button"
@@ -168,7 +193,7 @@ export function Home({ api }: { api: Api }) {
         </div>
       )}
       <h2>{t('home.activity')}</h2>
-      <ul>
+      <ul className="ss-activity">
         {data.activity.map((a, i) => (
           <li key={`${a.at}-${i}`}>
             {new Date(a.at).toLocaleString()} · {a.action} · {a.actor}
@@ -181,11 +206,11 @@ export function Home({ api }: { api: Api }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: number }) {
+function Kpi({ label, value, tone }: { label: string; value: number; tone?: 'warn' | 'info' }) {
   return (
-    <section className="ss-card">
-      <h2>{value}</h2>
-      <p>{label}</p>
+    <section className={tone ? `ss-kpi ss-kpi-${tone}` : 'ss-kpi'}>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </section>
   );
 }

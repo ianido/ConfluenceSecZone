@@ -8,6 +8,7 @@ import {
 } from '@secure-sections/shared';
 import { ApiError, unwrap, type Api } from './api';
 import { useT } from './i18n';
+import { CountFaces, LockIcon } from './visual';
 
 export function ClassificationBadge({ value }: { value: Classification | null }) {
   const t = useT();
@@ -66,12 +67,13 @@ export function SectionHeader({
     <header className="ss-header">
       <div className="ss-header-main">
         <h2 className="ss-header-title">
-          <span aria-hidden="true">🔒 </span>
+          <LockIcon />
           {meta.title ?? t('header.default')}
         </h2>
         <ClassificationBadge value={meta.classification} />
         <span className="ss-header-spacer" />
-        <span className="ss-muted ss-header-shared">
+        <span className="ss-muted ss-header-shared ss-shared">
+          <CountFaces users={meta.sharedWith.users} groups={meta.sharedWith.groups} />
           {t('header.shared', { users: meta.sharedWith.users, groups: meta.sharedWith.groups })}
         </span>
         {canAdminister && (

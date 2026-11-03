@@ -7,6 +7,7 @@ import {
   type RichDoc,
 } from '@secure-sections/shared';
 import { useT } from './i18n';
+import { CopyIcon, EyeIcon } from './visual';
 
 /**
  * Renders validated RichDoc JSON to React elements. There is no HTML parsing and no
@@ -44,20 +45,27 @@ function SecretChip({
   return (
     <span className="ss-secret">
       <span className="ss-chip">{label}</span>{' '}
-      {shown ? <span className="ss-secret-value">{value}</span> : <span>{t('secret.hidden')}</span>}{' '}
+      {shown ? (
+        <span className="ss-secret-value">{value}</span>
+      ) : (
+        <>
+          <span className="ss-secret-mask" />
+          <span className="ss-sr">{t('secret.hidden')}</span>
+        </>
+      )}{' '}
       <button
         type="button"
-        className="ss-btn"
+        className="ss-btn ss-small"
         onClick={() => {
           setShown(true);
           onReveal?.(label);
         }}
       >
-        {t('secret.reveal')}
+        <EyeIcon /> {t('secret.reveal')}
       </button>
       <button
         type="button"
-        className="ss-btn"
+        className="ss-btn ss-small"
         onClick={() => {
           void navigator.clipboard?.writeText(value).then(() => {
             setCopied(true);
@@ -65,7 +73,7 @@ function SecretChip({
           });
         }}
       >
-        {copied ? t('secret.copied') : t('secret.copy')}
+        <CopyIcon /> {copied ? t('secret.copied') : t('secret.copy')}
       </button>
     </span>
   );

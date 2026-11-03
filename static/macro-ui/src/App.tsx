@@ -30,6 +30,7 @@ import { SectionHeader } from './Header';
 import { useT } from './i18n';
 import { AuditPanel, HelpPanel, HistoryPanel, PermissionsPanel } from './Panels';
 import { RichRenderer } from './Renderer';
+import { LockIcon, TemplateMark } from './visual';
 
 type Tab = 'content' | 'permissions' | 'history' | 'audit' | 'help';
 
@@ -53,8 +54,7 @@ function StateCard({
       aria-live={role === 'alert' ? 'assertive' : 'polite'}
     >
       <h2>
-        <span aria-hidden="true">🔒 </span>
-        {title}
+        <LockIcon /> {title}
       </h2>
       <p>{body}</p>
       {children}
@@ -222,7 +222,9 @@ function Unconfigured({
         <p>{t('state.unconfigured.cannotCreate')}</p>
       ) : (
         <>
-          <h3>{t('wizard.title')}</h3>
+          <h3 className="ss-wizard-title">
+            <LockIcon /> {t('wizard.title')}
+          </h3>
           <ol>
             <li>{t('wizard.step1')}</li>
             <li>{t('wizard.step2')}</li>
@@ -268,8 +270,9 @@ function Unconfigured({
                   className="ss-template"
                   onClick={() => setTemplate(id)}
                 >
+                  <TemplateMark id={id} />
                   <strong>{t(`wizard.template.${id}`)}</strong>
-                  <span>{t(`wizard.template.${id}.hint`)}</span>
+                  <span className="ss-template-hint">{t(`wizard.template.${id}.hint`)}</span>
                 </button>
               ))}
             </div>
@@ -468,7 +471,8 @@ function ProtectedReading({
   }, [locked, onLock, protection.autoLockMinutes]);
   if (locked) {
     return (
-      <section className="ss-card ss-warn" role="status">
+      <section className="ss-card ss-lock-card" role="status">
+        <LockIcon large />
         <h2>{lockReason === 'idle' ? t('protect.locked') : t('protect.locked.initial')}</h2>
         <button type="button" className="ss-btn ss-primary" onClick={onUnlock}>
           {t('protect.unlock')}
@@ -489,12 +493,14 @@ function ProtectedReading({
           <span className="ss-muted">{t('protect.countdown', { time: remain })}</span>
         )}
         <button type="button" className="ss-btn" onClick={() => onLock('idle')}>
-          {t('protect.lockNow')}
+          <LockIcon /> {t('protect.lockNow')}
         </button>
       </div>
       {protection.watermark && (
         <div className="ss-watermark" aria-hidden="true">
-          {stamp}
+          {Array.from({ length: 6 }, (_, i) => (
+            <span key={i}>{`${stamp}    ${stamp}    ${stamp}`}</span>
+          ))}
         </div>
       )}
       <RichRenderer

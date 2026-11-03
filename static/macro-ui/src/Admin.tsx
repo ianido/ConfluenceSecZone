@@ -10,6 +10,7 @@ import {
 } from '@secure-sections/shared';
 import { safeCall, type Api } from './api';
 import { useT } from './i18n';
+import { GearIcon, TemplateMark } from './visual';
 
 type AdminTab =
   'policy' | 'retention' | 'classes' | 'templates' | 'recovery' | 'diagnostics' | 'audit';
@@ -118,7 +119,9 @@ export function Admin({ api }: { api: Api }) {
   return (
     <main className="ss-admin-page">
       <header className="ss-admin-head">
-        <h1>{t('admin.heading')}</h1>
+        <h1>
+          <GearIcon /> {t('admin.heading')}
+        </h1>
         <span className="ss-health">{t('admin.health')}</span>
       </header>
       <div className="ss-admin">
@@ -338,8 +341,9 @@ export function Admin({ api }: { api: Api }) {
               <div className="ss-templates">
                 {SECTION_TEMPLATES.map((id) => (
                   <div key={id} className="ss-template">
+                    <TemplateMark id={id} />
                     <strong>{t(`wizard.template.${id}`)}</strong>
-                    <span>{t(`wizard.template.${id}.hint`)}</span>
+                    <span className="ss-template-hint">{t(`wizard.template.${id}.hint`)}</span>
                   </div>
                 ))}
               </div>

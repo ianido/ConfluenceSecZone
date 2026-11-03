@@ -66,6 +66,22 @@ const ICONS = {
   rule: <path d="M4 12h16" />,
   undo: <path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" />,
   redo: <path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3" />,
+  quote: <path d="M6 16c1-4 3-6 6-6V7c-4 0-7 3-7 9zm8 0c1-4 3-6 6-6V7c-4 0-7 3-7 9z" />,
+  braces: (
+    <path d="M8 6C6 6 5 7 5 9v2c0 1-1 2-2 2 1 0 2 1 2 2v2c0 2 1 3 3 3M16 6c2 0 3 1 3 3v2c0 1 1 2 2 2-1 0-2 1-2 2v2c0 2-1 3-3 3" />
+  ),
+  image: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10" r="1.2" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
+  mention: <path d="M16 12v1.5a2.5 2.5 0 005 0V12a9 9 0 10-3.5 7.1" />,
+  secret: <path d="M6 12h.01M12 12h.01M18 12h.01" />,
+  callout: <path d="M12 4l8 14H4zM12 10v3M12 16h.01" />,
+  expand: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
+  compress: <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />,
 } as const;
 
 function countWords(text: string): number {
@@ -427,13 +443,13 @@ function Toolbar({
         t('toolbar.quote'),
         editor.isActive('blockquote'),
         () => chain().toggleBlockquote().run(),
-        '❝',
+        <Icon>{ICONS.quote}</Icon>,
       )}
       {btn(
         t('toolbar.codeBlock'),
         editor.isActive('codeBlock'),
         () => chain().toggleCodeBlock().run(),
-        '{ }',
+        <Icon>{ICONS.braces}</Icon>,
       )}
       {btn(
         t('toolbar.link'),
@@ -462,16 +478,21 @@ function Toolbar({
             attrs: { tone: 'info' },
             content: [{ type: 'paragraph' }],
           }),
-        t('callout.info'),
+        <Icon>{ICONS.callout}</Icon>,
       )}
-      {btn(t('toolbar.image'), imagePrompt, () => setImagePrompt(true), '▣')}
-      {btn(t('toolbar.mention'), mentionQuery !== null, () => setMentionQuery(''), '@')}
-      {btn(t('toolbar.secret'), secretOpen, () => setSecretOpen(true), '••')}
+      {btn(t('toolbar.image'), imagePrompt, () => setImagePrompt(true), <Icon>{ICONS.image}</Icon>)}
+      {btn(
+        t('toolbar.mention'),
+        mentionQuery !== null,
+        () => setMentionQuery(''),
+        <Icon>{ICONS.mention}</Icon>,
+      )}
+      {btn(t('toolbar.secret'), secretOpen, () => setSecretOpen(true), <Icon>{ICONS.secret}</Icon>)}
       {btn(
         fullscreen ? t('toolbar.exitFullscreen') : t('toolbar.fullscreen'),
         fullscreen,
         onFullscreen,
-        fullscreen ? '⤓' : '⤢',
+        <Icon>{fullscreen ? ICONS.compress : ICONS.expand}</Icon>,
       )}
       {btn(t('toolbar.undo'), false, () => chain().undo().run(), <Icon>{ICONS.undo}</Icon>)}
       {btn(t('toolbar.redo'), false, () => chain().redo().run(), <Icon>{ICONS.redo}</Icon>)}

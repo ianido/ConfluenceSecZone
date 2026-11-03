@@ -223,6 +223,9 @@ describe('Section header', () => {
     const { container } = renderWithI18n(<App api={api} />);
     expect(await screen.findByRole('heading', { name: /Q4 plan/ })).toBeTruthy();
     expect(screen.getByText('Confidential')).toBeTruthy();
+    expect(container.querySelector('.ss-lock, .ss-ico')).toBeTruthy();
+    expect(container.querySelector('.ss-class-confidential')).toBeTruthy();
+    expect(container.querySelector('.ss-faces')).toBeTruthy();
     expect(screen.getByText('Access: 3 people · 1 groups')).toBeTruthy();
     expect(screen.getByText(/Saved by Alice/)).toBeTruthy();
     await expectNoA11yViolations(container);
@@ -528,7 +531,7 @@ describe('Protected reading', () => {
     const { container } = renderWithI18n(<App api={api} />);
     expect(screen.queryByText('super-secret-value')).toBeNull();
     await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }));
-    expect(await screen.findByText(/Visible to Alice/)).toBeTruthy();
+    expect((await screen.findAllByText(/Visible to Alice/)).length).toBeGreaterThan(0);
     expect(container.querySelector('.ss-protect')).not.toBeNull();
     expect(container.textContent).not.toContain('super-secret-value');
     await userEvent.click(screen.getByRole('button', { name: 'Reveal for 15 seconds' }));

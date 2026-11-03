@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { PageSectionRow } from '@secure-sections/shared';
 import { safeCall, type Api } from './api';
+import { ClassificationBadge } from './Header';
 import { useT } from './i18n';
+import { LockIcon, Pill } from './visual';
 
 /** Page byline: titles and the caller's access only. Never the protected content. */
 export function Byline({ api }: { api: Api }) {
@@ -27,12 +29,17 @@ export function Byline({ api }: { api: Api }) {
       {rows.length === 0 ? (
         <p className="ss-muted">{t('byline.empty')}</p>
       ) : (
-        <ul>
+        <ul className="ss-byline">
           {rows.map((r) => (
             <li key={r.localId}>
-              <strong>{r.title ?? t('home.untitled')}</strong>
-              {r.classification ? ` · ${t(`class.${r.classification}`)}` : ''} ·{' '}
-              {r.role ? t(`role.${r.role}`) : t('byline.request')}
+              <span className="ss-byline-title">
+                <LockIcon />
+                <strong>{r.title ?? t('home.untitled')}</strong>
+                <ClassificationBadge value={r.classification} />
+              </span>
+              <Pill tone={r.role ? 'ok' : 'muted'}>
+                {r.role ? t(`role.${r.role}`) : t('role.none')}
+              </Pill>
             </li>
           ))}
         </ul>
