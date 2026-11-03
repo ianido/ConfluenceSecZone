@@ -96,4 +96,28 @@ describe('RichRenderer', () => {
       expect(container.querySelector(sel), sel).not.toBeNull();
     }
   });
+
+  it('masks a secret until the reader reveals it and never renders a remote image', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'secret', attrs: { label: 'Password', value: 's3cret-value' } }],
+        },
+        { type: 'image', attrs: { src: 'https://evil.example/x.png', alt: 'nope' } },
+        { type: 'callout', attrs: { tone: 'info' }, content: [{ type: 'paragraph' }] },
+        {
+          type: 'paragraph',
+          content: [{ type: 'mention', attrs: { accountId: 'bob', label: 'Bob' } }],
+        },
+      ],
+    } as RichDoc;
+    const { container } = renderWithI18n(<RichRenderer doc={doc} />);
+    expect(container.textContent).not.toContain('s3cret-value');
+    expect(screen.getByText('Hidden')).toBeTruthy();
+    expect(screen.getByText('@Bob')).toBeTruthy();
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('aside')).not.toBeNull();
+  });
 });

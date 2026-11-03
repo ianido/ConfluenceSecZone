@@ -35,6 +35,13 @@ export function docToLines(doc: RichDoc): string[] {
       case 'horizontalRule':
         out.push(`${prefix}---`);
         break;
+      case 'callout':
+        out.push(`${prefix}[${n.attrs.tone}]`);
+        for (const c of n.content) walk(c, prefix);
+        break;
+      case 'image':
+        out.push(`${prefix}[image${n.attrs.alt ? `: ${n.attrs.alt}` : ''}]`);
+        break;
       case 'table':
       case 'tableRow':
         n.content.forEach((c) => walk(c, prefix));
@@ -50,7 +57,15 @@ export function docToLines(doc: RichDoc): string[] {
 }
 
 function inlines(nodes: InlineNode[] | undefined): string {
-  return (nodes ?? []).map((n) => (n.type === 'hardBreak' ? ' ' : n.text)).join('');
+  return (nodes ?? [])
+    .map((n) => {
+      if (n.type === 'hardBreak') return ' ';
+      if (n.type === 'mention') return `@${n.attrs.label}`;
+      // The secret value stays out of the line diff; viewers reveal it on purpose.
+      if (n.type === 'secret') return `[secret: ${n.attrs.label}]`;
+      return n.text;
+    })
+    .join('');
 }
 
 function flatten(n: BlockNode): string {

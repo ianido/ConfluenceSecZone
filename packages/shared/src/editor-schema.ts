@@ -12,6 +12,12 @@ export const DOC_LIMITS = {
   maxTextLength: 20_000,
   maxHrefLength: 2_048,
   maxHeadingLevel: 4,
+  /** data:image base64 payload, small enough that the 150KB document cap still holds. */
+  maxImageSrcLength: 80_000,
+  maxAltLength: 200,
+  maxMentionLabel: 80,
+  maxSecretLabel: 40,
+  maxSecretValue: 2_000,
 } as const;
 
 export const ALLOWED_LINK_SCHEMES = ['http:', 'https:', 'mailto:'] as const;
@@ -29,6 +35,8 @@ export interface TextNode {
   marks?: Mark[];
 }
 
+export type CalloutTone = 'info' | 'warn';
+
 export type BlockNode =
   | { type: 'paragraph'; content?: InlineNode[] }
   | { type: 'heading'; attrs: { level: number }; content?: InlineNode[] }
@@ -41,9 +49,15 @@ export type BlockNode =
   | { type: 'table'; content: BlockNode[] }
   | { type: 'tableRow'; content: BlockNode[] }
   | { type: 'tableCell'; attrs?: CellAttrs; content: BlockNode[] }
-  | { type: 'tableHeader'; attrs?: CellAttrs; content: BlockNode[] };
+  | { type: 'tableHeader'; attrs?: CellAttrs; content: BlockNode[] }
+  | { type: 'callout'; attrs: { tone: CalloutTone }; content: BlockNode[] }
+  | { type: 'image'; attrs: { src: string; alt: string } };
 
-export type InlineNode = TextNode | { type: 'hardBreak' };
+export type InlineNode =
+  | TextNode
+  | { type: 'hardBreak' }
+  | { type: 'mention'; attrs: { accountId: string; label: string } }
+  | { type: 'secret'; attrs: { label: string; value: string } };
 export interface CellAttrs {
   colspan?: number;
   rowspan?: number;
@@ -74,6 +88,31 @@ export class DocValidationError extends Error {
     this.name = 'DocValidationError';
     this.issue = issue;
   }
+}
+
+const DATA_IMAGE_RE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+=*$/;
+const MENTION_ID_RE = /^[A-Za-z0-9:_-]{1,128}$/;
+
+/** Inline images are data URLs only. Remote and scriptable sources are rejected. */
+export function isDataImage(raw: unknown): raw is string {
+  return (
+    typeof raw === 'string' && raw.length <= DOC_LIMITS.maxImageSrcLength && DATA_IMAGE_RE.test(raw)
+  );
+}
+
+function hasCtl(s: string): boolean {
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f || c === 0x2028 || c === 0x2029) return true;
+  }
+  return false;
+}
+
+function plainLabel(raw: unknown, max: number): string {
+  if (typeof raw !== 'string') fail('BAD_ATTRS');
+  const t = raw.trim();
+  if (t.length === 0 || t.length > max || hasCtl(t)) fail('BAD_ATTRS');
+  return t;
 }
 
 export function isSafeHref(raw: unknown): raw is string {
@@ -177,6 +216,37 @@ function inlineContent(raw: unknown, b: Budget): InlineNode[] | undefined {
       count(b);
       return { type: 'hardBreak' };
     }
+    if (c.type === 'mention') {
+      onlyKeys(c, ['type', 'attrs']);
+      if (!isObj(c.attrs)) fail('BAD_ATTRS');
+      onlyKeys(c.attrs, ['accountId', 'label']);
+      const accountId = c.attrs.accountId;
+      if (typeof accountId !== 'string' || !MENTION_ID_RE.test(accountId)) fail('BAD_ATTRS');
+      count(b);
+      return {
+        type: 'mention',
+        attrs: { accountId, label: plainLabel(c.attrs.label, DOC_LIMITS.maxMentionLabel) },
+      };
+    }
+    if (c.type === 'secret') {
+      onlyKeys(c, ['type', 'attrs']);
+      if (!isObj(c.attrs)) fail('BAD_ATTRS');
+      onlyKeys(c.attrs, ['label', 'value']);
+      const value = c.attrs.value;
+      if (
+        typeof value !== 'string' ||
+        value.length === 0 ||
+        value.length > DOC_LIMITS.maxSecretValue ||
+        hasCtl(value)
+      ) {
+        fail('BAD_ATTRS');
+      }
+      count(b);
+      return {
+        type: 'secret',
+        attrs: { label: plainLabel(c.attrs.label, DOC_LIMITS.maxSecretLabel), value },
+      };
+    }
     return fail('UNKNOWN_NODE');
   });
 }
@@ -195,6 +265,18 @@ const BLOCKS_IN_CONTAINER = [
   'codeBlock',
   'horizontalRule',
   'table',
+  'callout',
+  'image',
+];
+
+const CALLOUT_CHILDREN = [
+  'paragraph',
+  'heading',
+  'bulletList',
+  'orderedList',
+  'blockquote',
+  'codeBlock',
+  'horizontalRule',
 ];
 
 function block(raw: unknown, b: Budget, depth: number, allowed: string[]): BlockNode {
@@ -275,6 +357,30 @@ function block(raw: unknown, b: Budget, depth: number, allowed: string[]): Block
     case 'horizontalRule':
       onlyKeys(raw, ['type']);
       return { type: 'horizontalRule' };
+    case 'callout': {
+      onlyKeys(raw, ['type', 'attrs', 'content']);
+      if (!isObj(raw.attrs)) fail('BAD_ATTRS');
+      onlyKeys(raw.attrs, ['tone']);
+      const tone = raw.attrs.tone;
+      if (tone !== 'info' && tone !== 'warn') fail('BAD_ATTRS');
+      return {
+        type: 'callout',
+        attrs: { tone },
+        content: blockList(raw.content, b, next, CALLOUT_CHILDREN),
+      };
+    }
+    case 'image': {
+      onlyKeys(raw, ['type', 'attrs']);
+      if (!isObj(raw.attrs)) fail('BAD_ATTRS');
+      onlyKeys(raw.attrs, ['src', 'alt', 'title']);
+      if (!isDataImage(raw.attrs.src)) fail('UNSAFE_URL');
+      const altRaw = raw.attrs.alt;
+      const alt =
+        altRaw === undefined || altRaw === null || altRaw === ''
+          ? ''
+          : plainLabel(altRaw, DOC_LIMITS.maxAltLength);
+      return { type: 'image', attrs: { src: raw.attrs.src, alt } };
+    }
     case 'table':
       onlyKeys(raw, ['type', 'content', 'attrs']);
       emptyAttrs(raw.attrs);
@@ -344,6 +450,7 @@ export function docIsEmpty(doc: RichDoc): boolean {
   const hasText = (n: unknown): boolean => {
     if (!isObj(n)) return false;
     if (n.type === 'text') return typeof n.text === 'string' && n.text.trim().length > 0;
+    if (n.type === 'mention' || n.type === 'secret' || n.type === 'image') return true;
     if (n.type === 'horizontalRule' || n.type === 'table') return true;
     return Array.isArray(n.content) && n.content.some(hasText);
   };

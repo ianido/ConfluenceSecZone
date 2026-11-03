@@ -153,6 +153,36 @@ summary:focus-visible {
   align-items: center;
   margin-top: 12px;
 }
+.ss-edit.ss-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow: auto;
+  padding: 16px;
+  background: var(--ss-bg);
+}
+.ss-slash {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+.ss-slash[hidden] {
+  display: none;
+}
+.ss-mention {
+  background: var(--ss-bg-raised);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.ss-secret {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.ss-heading-select select {
+  min-height: 32px;
+}
 .ss-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -12,13 +12,17 @@ import StarterKit from '@tiptap/starter-kit';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import {
   CHANGE_NOTE_MAX_LENGTH,
+  DOC_LIMITS,
+  isDataImage,
   isSafeHref,
   safeValidateDoc,
   type ContentPayload,
+  type PrincipalHit,
   type RichDoc,
 } from '@secure-sections/shared';
-import { ApiError, unwrap, type Api } from './api';
+import { ApiError, safeCall, unwrap, type Api } from './api';
 import { useT } from './i18n';
+import { Callout, Mention, SecretField, SecureImage } from './nodes';
 import { RichRenderer } from './Renderer';
 
 interface Props {
@@ -85,7 +89,24 @@ function extensions() {
     TableRow,
     TableHeader,
     TableCell,
+    Callout,
+    SecureImage,
+    Mention,
+    SecretField,
   ];
+}
+
+function dropSlash(editor: Editor): void {
+  const { $from } = editor.state.selection;
+  const before = $from.parent.textContent.slice(0, $from.parentOffset);
+  const at = before.lastIndexOf('/');
+  if (at < 0) return;
+  const from = $from.start() + at;
+  editor
+    .chain()
+    .focus()
+    .deleteRange({ from, to: from + 1 })
+    .run();
 }
 
 export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
@@ -99,6 +120,8 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
   const [changeNote, setChangeNote] = useState('');
   const initialJson = useRef(JSON.stringify(initial.doc));
   const [words, setWords] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [slash, setSlash] = useState(false);
 
   const exts = useMemo(extensions, []);
   const editor = useEditor({
@@ -117,6 +140,9 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
     onUpdate: ({ editor: e }) => {
       setDirty(JSON.stringify(e.getJSON()) !== initialJson.current);
       setWords(countWords(e.state.doc.textContent));
+      const { $from } = e.state.selection;
+      const before = $from.parent.textContent.slice(0, $from.parentOffset);
+      setSlash(/(^|\s)\/$/.test(before));
     },
   });
 
@@ -189,8 +215,21 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
   return (
     // The handler only adds a Ctrl+S shortcut; every action stays reachable through buttons.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <section aria-label={t('editor.label')} className="ss-edit" onKeyDown={onKeyDown}>
-      {editor && <Toolbar editor={editor} />}
+    <section
+      aria-label={t('editor.label')}
+      className={fullscreen ? 'ss-edit ss-fullscreen' : 'ss-edit'}
+      onKeyDown={onKeyDown}
+    >
+      {editor && (
+        <Toolbar
+          editor={editor}
+          api={api}
+          fullscreen={fullscreen}
+          slash={slash}
+          onFullscreen={() => setFullscreen((v) => !v)}
+          onSlashClose={() => setSlash(false)}
+        />
+      )}
       <EditorContent editor={editor} />
       <label className="ss-change-note">
         {t('editor.changeNote')}
@@ -273,10 +312,41 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({
+  editor,
+  api,
+  fullscreen,
+  slash,
+  onFullscreen,
+  onSlashClose,
+}: {
+  editor: Editor;
+  api: Api;
+  fullscreen: boolean;
+  slash: boolean;
+  onFullscreen: () => void;
+  onSlashClose: () => void;
+}) {
   const t = useT();
   const [linkInput, setLinkInput] = useState<string | null>(null);
   const [linkError, setLinkError] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionHits, setMentionHits] = useState<PrincipalHit[]>([]);
+  const [secretOpen, setSecretOpen] = useState(false);
+  const [secretLabel, setSecretLabel] = useState('');
+  const [secretValue, setSecretValue] = useState('');
+  const [imageAlt, setImageAlt] = useState('');
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const headingLevel = editor.isActive('heading')
+    ? String(editor.getAttributes('heading').level ?? '0')
+    : '0';
+
+  const insertBlock = (node: Record<string, unknown>) => {
+    dropSlash(editor);
+    editor.chain().focus().insertContent(node).run();
+    onSlashClose();
+  };
 
   const btn = (label: string, active: boolean, run: () => void, glyph: ReactNode) => (
     <button
@@ -318,18 +388,27 @@ function Toolbar({ editor }: { editor: Editor }) {
         () => chain().toggleCode().run(),
         <Icon>{ICONS.code}</Icon>,
       )}
-      {btn(
-        t('toolbar.h2'),
-        editor.isActive('heading', { level: 2 }),
-        () => chain().toggleHeading({ level: 2 }).run(),
-        'H2',
-      )}
-      {btn(
-        t('toolbar.h3'),
-        editor.isActive('heading', { level: 3 }),
-        () => chain().toggleHeading({ level: 3 }).run(),
-        'H3',
-      )}
+      <label className="ss-heading-select">
+        <span className="ss-sr">{t('toolbar.heading')}</span>
+        <select
+          aria-label={t('toolbar.heading')}
+          value={headingLevel}
+          onChange={(e) => {
+            const level = Number(e.target.value);
+            if (level === 0) chain().setParagraph().run();
+            else
+              chain()
+                .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
+                .run();
+          }}
+        >
+          <option value="0">{t('toolbar.paragraph')}</option>
+          <option value="1">{t('toolbar.h1')}</option>
+          <option value="2">{t('toolbar.h2')}</option>
+          <option value="3">{t('toolbar.h3')}</option>
+          <option value="4">{t('toolbar.h4')}</option>
+        </select>
+      </label>
       {btn(
         t('toolbar.bullets'),
         editor.isActive('bulletList'),
@@ -372,8 +451,107 @@ function Toolbar({ editor }: { editor: Editor }) {
         () => chain().setHorizontalRule().run(),
         <Icon>{ICONS.rule}</Icon>,
       )}
+      {btn(
+        t('toolbar.callout'),
+        editor.isActive('callout'),
+        () =>
+          insertBlock({
+            type: 'callout',
+            attrs: { tone: 'info' },
+            content: [{ type: 'paragraph' }],
+          }),
+        t('callout.info'),
+      )}
+      {btn(t('toolbar.image'), false, () => fileRef.current?.click(), '▣')}
+      {btn(t('toolbar.mention'), mentionQuery !== null, () => setMentionQuery(''), '@')}
+      {btn(t('toolbar.secret'), secretOpen, () => setSecretOpen(true), '••')}
+      {btn(
+        fullscreen ? t('toolbar.exitFullscreen') : t('toolbar.fullscreen'),
+        fullscreen,
+        onFullscreen,
+        fullscreen ? '⤓' : '⤢',
+      )}
       {btn(t('toolbar.undo'), false, () => chain().undo().run(), <Icon>{ICONS.undo}</Icon>)}
       {btn(t('toolbar.redo'), false, () => chain().redo().run(), <Icon>{ICONS.redo}</Icon>)}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        className="ss-sr"
+        aria-label={t('toolbar.image')}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
+            setImageError(t('image.invalid'));
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            const src = typeof reader.result === 'string' ? reader.result : '';
+            if (!isDataImage(src) || src.length > DOC_LIMITS.maxImageSrcLength) {
+              setImageError(t('image.tooLarge'));
+              return;
+            }
+            setImageError(null);
+            editor
+              .chain()
+              .focus()
+              .insertContent({ type: 'image', attrs: { src, alt: imageAlt.trim() } })
+              .run();
+          };
+          reader.readAsDataURL(file);
+        }}
+      />
+      <label>
+        <span className="ss-sr">{t('image.alt')}</span>
+        <input
+          value={imageAlt}
+          maxLength={DOC_LIMITS.maxAltLength}
+          placeholder={t('image.alt')}
+          aria-label={t('image.alt')}
+          onChange={(e) => setImageAlt(e.target.value)}
+        />
+      </label>
+      {imageError && <span role="alert">{imageError}</span>}
+      <div className="ss-slash" role="menu" aria-label={t('toolbar.slash')} hidden={!slash}>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            dropSlash(editor);
+            chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+            onSlashClose();
+          }}
+        >
+          {t('slash.table')}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            dropSlash(editor);
+            chain().toggleCodeBlock().run();
+            onSlashClose();
+          }}
+        >
+          {t('slash.code')}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() =>
+            insertBlock({
+              type: 'callout',
+              attrs: { tone: 'warn' },
+              content: [{ type: 'paragraph' }],
+            })
+          }
+        >
+          {t('slash.callout')}
+        </button>
+      </div>
       {linkInput !== null && (
         <form
           className="ss-link-form"
@@ -408,6 +586,103 @@ function Toolbar({ editor }: { editor: Editor }) {
             {t('action.confirm')}
           </button>
           <button type="button" className="ss-btn" onClick={() => setLinkInput(null)}>
+            {t('action.cancel')}
+          </button>
+        </form>
+      )}
+      {mentionQuery !== null && (
+        <form
+          className="ss-link-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void safeCall(api, 'searchPrincipals', { query: mentionQuery, type: 'USER' }).then(
+              (res) => {
+                if (res.ok) setMentionHits(res.data.hits);
+              },
+            );
+          }}
+        >
+          <p className="ss-muted">{t('mention.note')}</p>
+          <label>
+            {t('mention.search')}
+            <input
+              type="search"
+              value={mentionQuery}
+              onChange={(e) => setMentionQuery(e.target.value)}
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+            />
+          </label>
+          <button type="submit" className="ss-btn" disabled={mentionQuery.trim().length < 2}>
+            {t('mention.search')}
+          </button>
+          <button type="button" className="ss-btn" onClick={() => setMentionQuery(null)}>
+            {t('action.cancel')}
+          </button>
+          <ul className="ss-hits">
+            {mentionHits.map((h) => (
+              <li key={h.principalId}>
+                <button
+                  type="button"
+                  className="ss-btn"
+                  onClick={() => {
+                    editor
+                      .chain()
+                      .focus()
+                      .insertContent({
+                        type: 'mention',
+                        attrs: { accountId: h.principalId, label: h.label },
+                      })
+                      .run();
+                    setMentionQuery(null);
+                    setMentionHits([]);
+                  }}
+                >
+                  @{h.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </form>
+      )}
+      {secretOpen && (
+        <form
+          className="ss-link-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const label = secretLabel.trim();
+            const value = secretValue;
+            if (!label || !value || value.length > DOC_LIMITS.maxSecretValue) return;
+            editor.chain().focus().insertContent({ type: 'secret', attrs: { label, value } }).run();
+            setSecretLabel('');
+            setSecretValue('');
+            setSecretOpen(false);
+          }}
+        >
+          <label>
+            {t('secret.label')}
+            <input
+              value={secretLabel}
+              maxLength={DOC_LIMITS.maxSecretLabel}
+              onChange={(e) => setSecretLabel(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            {t('secret.value')}
+            <input
+              type="password"
+              value={secretValue}
+              maxLength={DOC_LIMITS.maxSecretValue}
+              onChange={(e) => setSecretValue(e.target.value)}
+              autoComplete="off"
+              required
+            />
+          </label>
+          <button type="submit" className="ss-btn">
+            {t('secret.insert')}
+          </button>
+          <button type="button" className="ss-btn" onClick={() => setSecretOpen(false)}>
             {t('action.cancel')}
           </button>
         </form>
