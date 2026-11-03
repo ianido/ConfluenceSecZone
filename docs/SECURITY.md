@@ -117,11 +117,11 @@ would be needed, which this product intentionally does not offer (no egress).
   second copy of ProseMirror from the bundle (944 KB -> 775 KB), which the Playwright test surfaced as a
   runtime "multiple versions of prosemirror-model" crash. `scripts/bundle-guard.mjs` now fails the build when more
   than one `prosemirror-model` copy is bundled.
-- **GHSA-w5hq-g745-h8pq / GHSA-qmq6-f8pr-cx5x** (`uuid` buffer bounds check, fixed in 14.0.0 for the 8.x and 11.x
-  lines), **GHSA-3g3m-2fjr-6pw4** (`glob` AbortSignal bypass, fixed in 14.0.2) and **GHSA-g3hv-75wg-m249**
+- **GHSA-w5hq-g745-h8pq** (`uuid` buffer bounds check, fixed in 11.1.1; GHSA-qmq6-f8pr-cx5x was withdrawn as a
+  duplicate), **GHSA-3g3m-2fjr-6pw4** (`glob` AbortSignal bypass, fixed in 14.0.2) and **GHSA-g3hv-75wg-m249**
   (`minimatch` globparts amplification, fixed in 11.0.1): the dev-only `@forge/cli` tree pins `uuid@^8.3.2`
-  (via `sockjs`) and `glob@^13` (via `@forge/cli-shared` and `@forge/manifest`), and `@forge/bridge` pulls
-  `uuid@^11.1.1`, so Dependabot could not raise them without downgrading `@forge/cli`/`@forge/bridge`. Fixed with
+  (via `sockjs`) and `glob@^13` (via `@forge/cli-shared` and `@forge/manifest`), blocking fixes within those ranges.
+  The existing `uuid@11.1.1` copy pulled by `@forge/bridge` is already patched. Applied
   `overrides` for `uuid` (`^14.0.3`), `glob` (`^14.0.2`) and `minimatch` (`^11.0.1`, scoped to `readdir-glob` and
   `@typescript-eslint/typescript-estree`). `uuid@14` and `glob@14` are ESM-first; they load from the CommonJS
   `sockjs`/`glob` consumers through `require(esm)` (Node >= 22.12, the repo minimum) and `v4()`/`glob()` keep their
