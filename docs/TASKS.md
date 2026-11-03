@@ -30,7 +30,7 @@
 ### Engineering backlog
 
 - [ ] T-OPS-1 Retention sweep pacing for very large estates (batch size or hourly trigger)
-- [ ] T-OPS-2 Admin UI for retention settings (currently a meta record)
+- [x] T-OPS-2 Admin UI for retention settings (site settings writes the existing retention meta; not exercised on a live site)
 - [ ] T-REL-1 Schema migration framework and upgrade tests once schema 2 exists
 - [ ] T-REL-2 Third-party notices file generated from the lockfile
 - [ ] T-SEC-1 Replace `read:content-details:confluence` if `forge lint`/S7 shows it is unnecessary
@@ -39,6 +39,13 @@
 - [x] T-UX-3 Access-request flow (denied card + Permissions queue)
 - [x] T-UX-4 Temporary grants, last access
 - [x] T-UX-5 History change notes and visual diff
-- [ ] T-UX-1 Capture final screenshots on a real site (including the new header, request card, expiry columns and history diff)
+- [x] T-UX-6 Headings, slash menu, mentions, images, callouts, secret fields, fullscreen
+- [x] T-UX-7 Copy grants, seed from page restrictions, multi-add, in-app notices
+- [x] T-UX-8 Revision labels and compare any two versions side by side
+- [x] T-UX-9 Watermark, auto-lock, copy deterrence, audited secret reveal
+- [x] T-UX-10 My secure sections (KPIs, filters, orphan delete, CSV)
+- [x] T-UX-11 Site settings (policy, classifications, retention, diagnostics, recovery)
+- [x] T-UX-12 Creation templates and the page byline
+- [ ] T-UX-1 Capture final screenshots on a real site (header, request card, expiry, history, editor nodes, sharing helpers, deterrence, My secure sections, site settings, templates, byline)
 - [ ] T-WIKI-1 Update the GitHub wiki after the new UI is deployed and exercised on a real site
 - [ ] T-QA-1 Load test with 200 sections, 500 grants, 150 KB documents (QA-17)

@@ -4,11 +4,11 @@
 
 ```
 repo
-├─ manifest.yml                 Forge manifest (macro, 3 functions, 1 scheduled trigger, storage entity, scopes)
+├─ manifest.yml                 Forge manifest (macro, global page, global settings, byline, 3 functions, 1 scheduled trigger, storage entity, scopes)
 ├─ packages/shared              Types and pure logic used by both sides: roles, editor schema/validator, contracts, i18n
 ├─ src/                         Forge functions (Node 24)
 │  ├─ index.ts                  handler (resolver), adfExport, maintenance
-│  ├─ resolvers.ts              Typed resolver surface; builds identity only from req.context
+│  ├─ resolvers.ts              Typed resolver surface; builds identity only from req.context (parseResolverContext on the macro, parseSiteContext on the page, settings and byline)
 │  ├─ domain/                   Authorization, section service, audit chain, retention, privacy (no Forge imports)
 │  ├─ ports/                    Interfaces: Store, ConfluenceGateway, PrivacyGateway, Clock, IdGenerator, Logger
 │  ├─ adapters/                 kvs-store.ts (@forge/kvs), forge-gateway.ts (@forge/api)
@@ -27,7 +27,7 @@ Forge: `adapters/kvs-store.ts` and `adapters/forge-gateway.ts`. Those two are th
 ```mermaid
 flowchart LR
   subgraph Browser["Confluence page (browser)"]
-    UI["Custom UI iframe<br/>React + Tiptap<br/>no storage, text-only rendering"]
+    UI["Custom UI iframe<br/>macro, global page, settings, byline<br/>React + Tiptap<br/>no storage, text-only rendering"]
   end
   subgraph Forge["Forge platform (Atlassian-hosted)"]
     R["Resolver function<br/>index.handler"]
@@ -36,7 +36,7 @@ flowchart LR
     M["Scheduled trigger<br/>maintenance: retention + privacy"]
     X["adfExport<br/>static placeholder"]
   end
-  C["Confluence REST<br/>permission/check, memberof,<br/>user and group directory"]
+  C["Confluence REST<br/>permission/check, restrictions,<br/>page summary, memberof,<br/>user and group directory"]
   P["Forge Privacy API<br/>report-accounts"]
 
   UI -- "bridge invoke(fn, payload)<br/>payload = hostile" --> R
@@ -71,7 +71,7 @@ stores the logical entity name inside `p` (`<entity>|<partition>`), which keeps 
 | `binding`      | `pageId:localId`             | `page:<pageId>` | localId        | cloudId, sectionId, kind (CREATE/COPY/REBIND). The security anchor.                           |
 | `revision`     | `sectionId:<padded version>` | sectionId       | padded version | content JSON + sha256, author, restoredFrom                                                   |
 | `audit`        | `sectionId:<id>`             | sectionId       | entry id       | action, actor, meta, prevHash, hash                                                           |
-| `meta`         | name                         | `meta`          | name           | retention/privacy cursors, retention config                                                   |
+| `meta`         | name                         | `meta`          | name           | retention config, retention-swept time, privacy cursors, site policy                          |
 
 Multi-record invariants are enforced by `transact()` with `expectRev` conditions (compare-and-set on `rev`)
 and `create` conditions (`rev` not exists). Examples: save = new revision + section head bump + audit entry in
@@ -83,7 +83,9 @@ A transaction holds at most 25 operations; the largest operation (copy) uses 6.
 ## Request pipeline (every resolver)
 
 ```
-req.context --parseResolverContext--> TrustedContext | null  (null => UNAVAILABLE, no further work)
+req.context --parseResolverContext or parseSiteContext--> TrustedContext | null  (null => UNAVAILABLE, no further work)
+Macro calls require a page id and a localId. Site calls (global page, settings, byline) require account, cloud,
+module and environment. The byline also requires a page id. parseResolverContext is not relaxed.
    |
    v
 AuthorizationService.resolve(ctx)
@@ -102,6 +104,8 @@ domain operation inside withRetry(4) using transact()
 Denials are generic; `getSection` maps to UI states (UNCONFIGURED, DENIED, UNAVAILABLE, CORRUPTED, READY).
 A user without a grant who can view the page may separately call `getAccessInfo` / `requestAccess` (ADR-0009);
 those return only public title/classification, a few administrator names and the caller's own request.
+`listMySections`, `exportMyAudit` and `listPageSections` also succeed for a page viewer with no grant. They
+return an empty list, a CSV header, or public title and classification. They do not return content (ADR-0010).
 
 ## Section binding protocol (summary; ADR-0002)
 
@@ -115,7 +119,12 @@ those return only public title/classification, a few administrator names and the
 
 ## Frontend
 
+The same Custom UI bundle reads `view.getContext()` and mounts one surface. The module key or extension type
+selects Admin (global settings), Byline, Home (global page) or the macro `App`. That choice is display only.
+Authorization stays in the resolver.
+
 - State machine in `App.tsx`: LOADING, UNAVAILABLE, DENIED, REVOKED, CORRUPTED, UNCONFIGURED (wizard), READY.
+  READY may show an in-app notice and the deterrence flags from the server (watermark, auto-lock, protect copy).
 - `Renderer.tsx` renders the validated document with React elements only (no HTML injection) and re-checks
   link hrefs; Tiptap is used only for editing, and its output is validated again by the same shared validator
   on the client before sending and on the server before storing.

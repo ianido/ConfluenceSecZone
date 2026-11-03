@@ -5,7 +5,10 @@
 Not published. First feature-complete build for testing on a dedicated development site.
 
 **Known limitations:** storage and Confluence integration have not been executed on a live site (see docs/QA_MATRIX.md spikes S1 to S8);
-no export of audit data; no admin UI for retention settings; no automated tenant migration tests; legal documents are drafts.
+no automated tenant migration tests; legal documents are drafts. Audit CSV export and the retention screen exist
+and are covered offline; neither has been exercised on a live site.
 
-Later unreleased work on this branch (title/classification, access requests, temporary grants, history diff)
-is documented in CHANGELOG.md and is not part of a tagged 0.1.0 until it is deployed and exercised.
+Unreleased work on `feat/title-requests-expiry` (title and classification, access requests, temporary grants,
+history diff and labels, editor nodes, grant copy and page-restriction seeding, reader deterrence, My secure
+sections, site settings, templates and the page byline) is documented in CHANGELOG.md. It is not part of a
+tagged 0.1.0 until it is deployed and exercised. The two new scopes need an administrator to consent again.

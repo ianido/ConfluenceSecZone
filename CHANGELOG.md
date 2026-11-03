@@ -11,6 +11,14 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 - Temporary grants with a 7 / 30 / 90-day expiry, a last-access column, and renewal of expired people. An expired administrator does not count as the last administrator.
 - Optional change note on save and a line-level History comparison against the previous version.
 - Editor polish: vector toolbar icons, word count, `Ctrl+S`.
+- Editor nodes: heading levels H1–H4, a `/` menu (table, code, callout), visual @mentions (display only, not a grant), data-URL images (png/jpeg/gif/webp, source at most 80 KB), info and warn callouts, inline secret fields, and fullscreen editing.
+- Permission helpers: copy missing grants from another section, seed grants from the page's own restrictions, add several people at once, and an in-app notice when you are added. Notices are not Confluence notifications.
+- Revision labels (40 characters) and a comparison of any two versions, as a line diff and side by side. Secret values appear in the line diff as `[secret: label]`.
+- Reader deterrence for a classification: watermark (name and date), inactivity auto-lock, and discouraging select/print. Revealing a secret field is audited with the label only. Defaults: Restricted on (watermark, 5 minutes, protect copy); Internal and Confidential off.
+- **My secure sections** global page: counts, filters, orphan rows for deleted pages, recent activity without content, and a CSV export of audit metadata (500 rows).
+- Site settings: request and grant policy, per-classification deterrence, retention numbers, diagnostics, and recovery of a section that has no active administrator.
+- Creation templates (blank, credentials, HR, minutes), an optional person to share with at creation, and a page byline that lists title, classification and your role. The byline never shows content.
+- Scopes `read:content.restriction:confluence` (read the page's restrictions in order to seed an ACL) and `read:page:confluence` (tell a deleted page from a page you cannot see). Installing this build needs an administrator to accept them again.
 - Forge macro `secure-section-macro` with Custom UI (React 19, Tiptap 3), resolver, `adfExport` placeholder and daily maintenance trigger.
 - Domain: binding protocol, ACL with VIEW/MODIFY/ADMINISTER, final-administrator rule, revisions, hash-chained audit, retention, privacy anonymisation, site-admin recovery.
 - Storage adapter for Forge Custom Entity Store transactions (not yet executed against a live site).
@@ -21,3 +29,5 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 
 - Pinned `prosemirror-view` >= 1.42.9 (GHSA-c8x8-7fp4-3x9w) and removed a duplicate ProseMirror copy from the bundle.
 - Added the missing `report:personal-data` scope and a 7-day personal-data reporting floor.
+- A secret field value lives in the stored document. Anyone with View, and anyone who can read app storage, can read it. The reveal audit stores the label, never the value.
+- Watermark, auto-lock and copy/print hiding are deterrence. They are not a boundary: View still returns the document.
