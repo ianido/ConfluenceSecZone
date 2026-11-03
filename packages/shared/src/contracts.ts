@@ -42,6 +42,9 @@ export const RESOLVER_FUNCTIONS = [
   'listMySections',
   'exportMyAudit',
   'deleteOrphan',
+  'getAdminOverview',
+  'updateSitePolicy',
+  'recoverUnowned',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -313,6 +316,16 @@ export interface MySections {
   activity: Array<{ at: string; action: string; actor: string; title: string | null }>;
 }
 
+export interface AdminOverview {
+  sectionCount: number;
+  truncated: boolean;
+  noAdmin: Array<{ sectionId: string; title: string | null; pageId: string }>;
+  orphans: Array<{ sectionId: string; title: string | null; pageId: string }>;
+  lastSweep: string | null;
+  policy: SitePolicy;
+  retention: RetentionConfig;
+}
+
 export interface AuditExport {
   csv: string;
   rows: number;
@@ -428,6 +441,15 @@ export interface RequestMap {
   deleteOrphan: {
     req: { sectionId: string; confirm: 'DELETE' };
     res: Result<{ deleted: true }>;
+  };
+  getAdminOverview: { req: Record<string, never>; res: Result<AdminOverview> };
+  updateSitePolicy: {
+    req: { policy: SitePolicy; retention: RetentionConfig };
+    res: Result<AdminOverview>;
+  };
+  recoverUnowned: {
+    req: { sectionId: string; newAdministratorAccountId: string; confirm: string };
+    res: Result<{ recovered: true }>;
   };
 }
 

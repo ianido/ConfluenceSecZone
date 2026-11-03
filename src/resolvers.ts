@@ -78,7 +78,15 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     };
 
   const guardedSite =
-    <K extends 'listMySections' | 'exportMyAudit' | 'deleteOrphan'>(
+    <
+      K extends
+        | 'listMySections'
+        | 'exportMyAudit'
+        | 'deleteOrphan'
+        | 'getAdminOverview'
+        | 'updateSitePolicy'
+        | 'recoverUnowned',
+    >(
       fn: K,
       run: (ctx: SiteContext, p: Record<string, unknown>) => Promise<unknown>,
     ): Handler<K> =>
@@ -177,6 +185,13 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     exportMyAudit: guardedSite('exportMyAudit', (ctx) => service.exportMyAudit(ctx)),
     deleteOrphan: guardedSite('deleteOrphan', (ctx, p) =>
       service.deleteOrphan(ctx, p.sectionId, p.confirm),
+    ),
+    getAdminOverview: guardedSite('getAdminOverview', (ctx) => service.getAdminOverview(ctx)),
+    updateSitePolicy: guardedSite('updateSitePolicy', (ctx, p) =>
+      service.updateSitePolicy(ctx, p.policy, p.retention),
+    ),
+    recoverUnowned: guardedSite('recoverUnowned', (ctx, p) =>
+      service.recoverUnowned(ctx, p.sectionId, p.newAdministratorAccountId, p.confirm),
     ),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {

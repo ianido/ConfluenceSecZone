@@ -30,6 +30,7 @@ import {
   type SectionView,
   type GrantNotice,
   type ProtectionFlags,
+  type AdminOverview,
   type AuditExport,
   type MySections,
   type SitePolicy,
@@ -899,7 +900,8 @@ export class SecureSectionService {
     const policy = await this.readSitePolicy();
     let cap = policy.maxGrantDays;
     try {
-      if (await this.gateway.isSiteAdmin(ctx.accountId)) cap = MAX_GRANT_TTL_DAYS;
+      // Site administrators are not guests: the shorter cap applies to everyone else.
+      if (p.type === 'USER' && (await this.gateway.isSiteAdmin(p.id))) cap = MAX_GRANT_TTL_DAYS;
     } catch (e) {
       if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
       throw e;
@@ -1605,7 +1607,7 @@ export class SecureSectionService {
   }
 
   async getDiagnostics(ctx: TrustedContext): Promise<Diagnostics> {
-    await this.requireSiteAdmin(ctx);
+    await this.requireSiteAdmin(ctx.accountId);
     const checks: Diagnostics['checks'] = [];
     const canary = Keys.meta(`canary-${this.ids.uuid().slice(-8)}`);
     try {
@@ -1670,9 +1672,9 @@ export class SecureSectionService {
     };
   }
 
-  private async requireSiteAdmin(ctx: TrustedContext): Promise<void> {
+  private async requireSiteAdmin(accountId: string): Promise<void> {
     try {
-      if (!(await this.gateway.isSiteAdmin(ctx.accountId))) throw new DomainError('DENIED');
+      if (!(await this.gateway.isSiteAdmin(accountId))) throw new DomainError('DENIED');
     } catch (e) {
       if (e instanceof GatewayError) throw new DomainError('UNAVAILABLE');
       throw e;
@@ -1690,7 +1692,7 @@ export class SecureSectionService {
   ): Promise<{ recovered: true }> {
     if (input.confirm !== 'RECOVER') throw new DomainError('INVALID_REQUEST');
     const target = this.validatePrincipal('USER', input.newAdministratorAccountId);
-    await this.requireSiteAdmin(ctx);
+    await this.requireSiteAdmin(ctx.accountId);
     await this.assertPrincipalExists('USER', target.id);
     return this.withRetry(async () => {
       const page = await this.authz.pageAccess(ctx.accountId, ctx.pageId);
@@ -1936,6 +1938,129 @@ export class SecureSectionService {
       return { deleted: true as const };
     });
   }
+
+  async getAdminOverview(ctx: SiteContext): Promise<AdminOverview> {
+    await this.requireSiteAdmin(ctx.accountId);
+    const listed = await this.store.list<SectionDoc>({
+      entity: 'section',
+      partition: 'all',
+      order: 'ASC',
+      limit: 200,
+    });
+    const noAdmin: AdminOverview['noAdmin'] = [];
+    const orphans: AdminOverview['orphans'] = [];
+    for (const item of listed.items) {
+      const s = item.value;
+      if (s.cloudId !== ctx.cloudId || s.status !== 'ACTIVE') continue;
+      if (!(await this.hasActiveAdministrator(s))) {
+        noAdmin.push({ sectionId: s.sectionId, title: s.title ?? null, pageId: s.primaryPageId });
+      }
+      try {
+        const page = await this.gateway.pageSummary(s.primaryPageId);
+        if (page.status === 'MISSING') {
+          orphans.push({ sectionId: s.sectionId, title: s.title ?? null, pageId: s.primaryPageId });
+        }
+      } catch (e) {
+        if (!(e instanceof GatewayError)) throw e;
+      }
+    }
+    const sweep = await this.store.get<MetaDoc<string>>('meta', Keys.meta('retention-swept'));
+    return {
+      sectionCount: listed.items.filter((i) => i.value.status === 'ACTIVE').length,
+      truncated: listed.nextCursor !== null,
+      noAdmin,
+      orphans,
+      lastSweep: typeof sweep?.value.value === 'string' ? sweep.value.value : null,
+      policy: await this.readSitePolicy(),
+      retention: await this.getRetention(),
+    };
+  }
+
+  async updateSitePolicy(
+    ctx: SiteContext,
+    policyRaw: unknown,
+    retentionRaw: unknown,
+  ): Promise<AdminOverview> {
+    await this.requireSiteAdmin(ctx.accountId);
+    const policy = parseSitePolicy(policyRaw);
+    const retention = parseRetention(retentionRaw);
+    await this.writeMeta('site-policy', policy);
+    await this.writeMeta('retention', retention);
+    return this.getAdminOverview(ctx);
+  }
+
+  async recoverUnowned(
+    ctx: SiteContext,
+    sectionId: unknown,
+    newAdministratorAccountId: unknown,
+    confirm: unknown,
+  ): Promise<{ recovered: true }> {
+    if (confirm !== 'RECOVER') throw new DomainError('INVALID_REQUEST');
+    if (typeof sectionId !== 'string' || !UUID_RE.test(sectionId)) throw new DomainError('DENIED');
+    const target = this.validatePrincipal('USER', newAdministratorAccountId);
+    await this.requireSiteAdmin(ctx.accountId);
+    await this.assertPrincipalExists('USER', target.id);
+    return this.withRetry(async () => {
+      const sec = await this.store.get<SectionDoc>('section', Keys.section(sectionId));
+      if (!sec || sec.value.cloudId !== ctx.cloudId || sec.value.status !== 'ACTIVE') {
+        throw new DomainError('NOT_RECOVERABLE');
+      }
+      const s = sec.value;
+      if (await this.hasActiveAdministrator(s)) throw new DomainError('NOT_RECOVERABLE');
+      const now = this.nowIso();
+      const existing = s.grants.find(
+        (g) => g.principalType === 'USER' && g.principalId === target.id,
+      );
+      const grants = existing
+        ? s.grants.map((g) => (g === existing ? { ...g, role: 'ADMINISTER' as const } : g))
+        : [
+            ...s.grants,
+            {
+              principalType: 'USER' as const,
+              principalId: target.id,
+              role: 'ADMINISTER' as const,
+              addedAt: now,
+              addedBy: ctx.accountId,
+            },
+          ];
+      const next: SectionDoc = {
+        ...s,
+        grants,
+        ownerAccountId: target.id,
+        aclVersion: s.aclVersion + 1,
+        updatedAt: now,
+      };
+      const { audit, op } = this.chain(s, 'ADMIN_RECOVERY', ctx.accountId, {
+        newAdministrator: target.id,
+      });
+      next.auditHead = audit.hash;
+      await this.store.transact([this.putSection(sec, next), op]);
+      return { recovered: true as const };
+    });
+  }
+
+  private async writeMeta(name: string, value: unknown): Promise<void> {
+    const cur = await this.store.get<MetaDoc>('meta', Keys.meta(name));
+    const doc: MetaDoc = { schema: SCHEMA_VERSION, value, updatedAt: this.nowIso() };
+    await this.store.transact([
+      cur
+        ? {
+            kind: 'put',
+            entity: 'meta',
+            key: Keys.meta(name),
+            value: doc,
+            index: Idx.meta(name),
+            expectRev: cur.rev,
+          }
+        : {
+            kind: 'create',
+            entity: 'meta',
+            key: Keys.meta(name),
+            value: doc,
+            index: Idx.meta(name),
+          },
+    ]);
+  }
 }
 
 function csvCell(value: string): string {
@@ -1944,6 +2069,74 @@ function csvCell(value: string): string {
 }
 
 export { validateDoc };
+
+function parseSitePolicy(raw: unknown): SitePolicy {
+  if (typeof raw !== 'object' || raw === null) throw new DomainError('INVALID_REQUEST');
+  const o = raw as Record<string, unknown>;
+  const days = o.maxGrantDays;
+  if (
+    typeof days !== 'number' ||
+    !Number.isInteger(days) ||
+    days < 1 ||
+    days > MAX_GRANT_TTL_DAYS
+  ) {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  if (o.whoMayCreate !== 'PAGE_EDITORS' && o.whoMayCreate !== 'SITE_ADMINS') {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  if (!Array.isArray(o.classes)) throw new DomainError('INVALID_REQUEST');
+  const classes = DEFAULT_SITE_POLICY.classes.map((fallback) => {
+    const found = o.classes.find(
+      (c) => typeof c === 'object' && c !== null && (c as { id?: unknown }).id === fallback.id,
+    ) as { watermark?: unknown; protectCopy?: unknown; autoLockMinutes?: unknown } | undefined;
+    if (!found) throw new DomainError('INVALID_REQUEST');
+    const minutes = found.autoLockMinutes;
+    if (
+      minutes !== null &&
+      (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 1 || minutes > 120)
+    ) {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    if (typeof found.watermark !== 'boolean' || typeof found.protectCopy !== 'boolean') {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    return {
+      id: fallback.id,
+      watermark: found.watermark,
+      protectCopy: found.protectCopy,
+      autoLockMinutes: minutes,
+    };
+  });
+  if (typeof o.allowRequests !== 'boolean' || typeof o.requireChangeNote !== 'boolean') {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  return {
+    allowRequests: o.allowRequests,
+    maxGrantDays: days,
+    requireChangeNote: o.requireChangeNote,
+    whoMayCreate: o.whoMayCreate,
+    classes,
+  };
+}
+
+function parseRetention(raw: unknown): RetentionConfig {
+  if (typeof raw !== 'object' || raw === null) throw new DomainError('INVALID_REQUEST');
+  const o = raw as Record<string, unknown>;
+  const num = (key: keyof RetentionConfig, min: number, max: number): number => {
+    const v = o[key];
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max) {
+      throw new DomainError('INVALID_REQUEST');
+    }
+    return v;
+  };
+  return {
+    revisionsKeep: num('revisionsKeep', 1, 500),
+    revisionsMaxAgeDays: num('revisionsMaxAgeDays', 1, 3650),
+    auditMaxAgeDays: num('auditMaxAgeDays', 1, 3650),
+    deletedSectionGraceDays: num('deletedSectionGraceDays', 1, 365),
+  };
+}
 
 function hasControlChars(t: string): boolean {
   for (let i = 0; i < t.length; i += 1) {

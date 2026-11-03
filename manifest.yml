@@ -38,6 +38,12 @@ modules:
         function: resolver
       adfExport:
         function: adf-export
+  confluence:globalSettings:
+    - key: secure-sections-admin
+      resource: macro-ui
+      resolver:
+        function: resolver
+      title: Secure Sections
   confluence:globalPage:
     - key: secure-sections-home
       resource: macro-ui

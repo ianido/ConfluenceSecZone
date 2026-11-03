@@ -61,6 +61,12 @@ describe('resolver surface: every function denies unauthorised callers and leaks
     setRevisionTag: { version: 1, tag: 'approved' },
     revealSecret: { label: 'Password' },
     deleteOrphan: { sectionId: '00000000-0000-4000-8000-000000000099', confirm: 'DELETE' },
+    updateSitePolicy: { policy: {}, retention: {} },
+    recoverUnowned: {
+      sectionId: '00000000-0000-4000-8000-000000000099',
+      newAdministratorAccountId: 'mallory',
+      confirm: 'RECOVER',
+    },
   };
 
   for (const fn of RESOLVER_FUNCTIONS.filter((f) => f !== 'createSection')) {

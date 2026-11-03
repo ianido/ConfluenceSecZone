@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { view } from '@forge/bridge';
 import { resolveLocale, type Locale } from '@secure-sections/shared';
 import { forgeApi } from './api';
+import { Admin } from './Admin';
 import { App } from './App';
 import { Home } from './Home';
 import { I18nProvider } from './i18n';
@@ -33,7 +34,14 @@ function Root() {
       })
       .catch(() => undefined);
   }, []);
-  const screen = surface === 'home' ? <Home api={forgeApi} /> : <App api={forgeApi} />;
+  const screen =
+    surface === 'home' ? (
+      <Home api={forgeApi} />
+    ) : surface === 'admin' ? (
+      <Admin api={forgeApi} />
+    ) : (
+      <App api={forgeApi} />
+    );
   return <I18nProvider locale={locale}>{screen}</I18nProvider>;
 }
 
