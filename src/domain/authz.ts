@@ -1,5 +1,6 @@
 import { maxRole, type Role } from '@secure-sections/shared';
 import { GatewayError, type ConfluenceGateway, type PagePermissions } from '../ports/confluence';
+import type { Clock } from '../ports/runtime';
 import type { Doc, Store } from '../ports/store';
 import type { TrustedContext } from './context';
 import { DomainError } from './errors';
@@ -33,6 +34,7 @@ export class AuthorizationService {
   constructor(
     private readonly store: Store,
     private readonly gateway: ConfluenceGateway,
+    private readonly clock: Clock,
   ) {}
 
   /** Page rights as the invoking user. Throws DomainError('UNAVAILABLE') when Confluence cannot answer. */
@@ -49,8 +51,11 @@ export class AuthorizationService {
   async roleOnSection(section: SectionDoc, accountId: string): Promise<RoleResolution> {
     const roles: Role[] = [];
     const sources: RoleResolution['sources'] = [];
+    const now = this.clock.now().getTime();
+    const live = (g: (typeof section.grants)[number]): boolean =>
+      !g.expiresAt || Date.parse(g.expiresAt) > now;
     for (const g of section.grants) {
-      if (g.principalType === 'USER' && g.principalId === accountId) {
+      if (g.principalType === 'USER' && g.principalId === accountId && live(g)) {
         roles.push(g.role);
         sources.push({ via: 'USER', principalId: g.principalId, role: g.role });
       }
@@ -63,7 +68,7 @@ export class AuthorizationService {
         groupsComplete = m.complete;
         const member = new Set(m.groupIds);
         for (const g of groupGrants) {
-          if (member.has(g.principalId)) {
+          if (member.has(g.principalId) && live(g)) {
             roles.push(g.role);
             sources.push({ via: 'GROUP', principalId: g.principalId, role: g.role });
           }

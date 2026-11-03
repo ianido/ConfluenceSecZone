@@ -179,6 +179,16 @@ const en = {
   'requests.rejected': 'Request rejected.',
   'requests.inactive': 'This account is not active',
   'requests.badge': 'pending requests',
+  'perm.expires': 'Expires',
+  'perm.expires.never': 'Never',
+  'perm.expires.in7': 'In 7 days',
+  'perm.expires.in30': 'In 30 days',
+  'perm.expires.in90': 'In 90 days',
+  'perm.expires.custom': 'On a date…',
+  'perm.expires.expired': 'Expired {when}',
+  'perm.lastAccess': 'Last access',
+  'perm.lastAccess.never': 'Never',
+  'perm.renew': 'Renew',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -363,6 +373,16 @@ const es: Record<MessageKey, string> = {
   'requests.rejected': 'Solicitud rechazada.',
   'requests.inactive': 'Esta cuenta no está activa',
   'requests.badge': 'solicitudes pendientes',
+  'perm.expires': 'Vence',
+  'perm.expires.never': 'Nunca',
+  'perm.expires.in7': 'En 7 días',
+  'perm.expires.in30': 'En 30 días',
+  'perm.expires.in90': 'En 90 días',
+  'perm.expires.custom': 'En una fecha…',
+  'perm.expires.expired': 'Venció {when}',
+  'perm.lastAccess': 'Último acceso',
+  'perm.lastAccess.never': 'Nunca',
+  'perm.renew': 'Renovar',
 };
 
 const CATALOGS: Record<Locale, Record<MessageKey, string>> = { en, es };

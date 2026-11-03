@@ -104,6 +104,7 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
         principalId: p.principalId,
         role: p.role,
         expectedAclVersion: p.expectedAclVersion,
+        expiresAt: p.expiresAt,
       }),
     ),
     revokeGrant: guarded('revokeGrant', (ctx, p) =>

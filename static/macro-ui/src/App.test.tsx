@@ -289,6 +289,8 @@ describe('Permissions panel', () => {
           addedAt: '',
           addedBy: 'alice',
           active: true,
+          expiresAt: null,
+          lastAccessAt: '2026-01-01T00:00:00.000Z',
         },
         {
           principalType: 'GROUP',
@@ -298,6 +300,8 @@ describe('Permissions panel', () => {
           addedAt: '',
           addedBy: 'alice',
           active: false,
+          expiresAt: null,
+          lastAccessAt: null,
         },
       ],
     },

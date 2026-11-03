@@ -157,6 +157,9 @@ export interface EffectiveAccess {
   groupResolution: 'OK' | 'DEGRADED';
 }
 
+export const GRANT_EXPIRY_PRESETS_DAYS = [7, 30, 90] as const;
+export const MAX_GRANT_TTL_DAYS = 365;
+
 export interface Grant {
   principalType: PrincipalType;
   principalId: string;
@@ -165,6 +168,9 @@ export interface Grant {
   addedAt: string;
   addedBy: string;
   active: boolean;
+  /** ISO timestamp; null means the grant does not expire. */
+  expiresAt: string | null;
+  lastAccessAt: string | null;
 }
 
 export interface GrantList {
@@ -272,6 +278,7 @@ export interface RequestMap {
       principalId: string;
       role: Role;
       expectedAclVersion: number;
+      expiresAt?: string | null;
     };
     res: Result<GrantList>;
   };

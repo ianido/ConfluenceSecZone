@@ -27,6 +27,7 @@ import {
   type SectionView,
   type UserSummary,
   type AuditAction,
+  MAX_GRANT_TTL_DAYS,
   TITLE_MAX_LENGTH,
   isClassification,
   isPrincipalType,
@@ -97,7 +98,7 @@ export class SecureSectionService {
     this.clock = deps.clock;
     this.ids = deps.ids;
     this.logger = deps.logger;
-    this.authz = new AuthorizationService(deps.store, deps.gateway);
+    this.authz = new AuthorizationService(deps.store, deps.gateway, deps.clock);
   }
 
   // ---------------------------------------------------------------- helpers
@@ -276,7 +277,27 @@ export class SecureSectionService {
       throw new DomainError('DENIED');
     }
     if (opts.pageEdit && !r.page.canEdit) throw new DomainError('PAGE_EDIT_REQUIRED');
+    void this.touchLastAccess(r, ctx.accountId);
     return r;
+  }
+
+  /** Best-effort last-seen stamp on the caller's USER grant. Failures never affect the caller. */
+  private async touchLastAccess(r: BoundResolved, accountId: string): Promise<void> {
+    const s = r.section.value;
+    const now = this.nowIso();
+    const day = now.slice(0, 10);
+    const mine = s.grants.find((g) => g.principalType === 'USER' && g.principalId === accountId);
+    if (!mine) return;
+    if (mine.lastAccessAt && mine.lastAccessAt.slice(0, 10) === day) return;
+    const next: SectionDoc = {
+      ...s,
+      grants: s.grants.map((g) => (g === mine ? { ...g, lastAccessAt: now } : g)),
+    };
+    try {
+      await this.store.transact([this.putSection(r.section, next)]);
+    } catch {
+      /* last-access is observational */
+    }
   }
 
   private viewOf(r: BoundResolved, content: ContentPayload): SectionView {
@@ -613,12 +634,26 @@ export class SecureSectionService {
       /* best effort labels */
     }
     const grants: Grant[] = section.grants.map((g) => {
+      const extra = {
+        expiresAt: g.expiresAt ?? null,
+        lastAccessAt: g.lastAccessAt ?? null,
+      };
       if (g.principalType === 'USER') {
         const u = users.get(g.principalId);
-        return { ...g, label: u?.displayName ?? g.principalId, active: u ? u.active : true };
+        return {
+          ...g,
+          ...extra,
+          label: u?.displayName ?? g.principalId,
+          active: u ? u.active : true,
+        };
       }
       const gr = groups.get(g.principalId);
-      return { ...g, label: gr?.name ?? g.principalId, active: gr ? gr.exists : true };
+      return {
+        ...g,
+        ...extra,
+        label: gr?.name ?? g.principalId,
+        active: gr ? gr.exists : true,
+      };
     });
     return { grants, aclVersion: section.aclVersion, ownerAccountId: section.ownerAccountId };
   }
@@ -655,8 +690,13 @@ export class SecureSectionService {
     return { type, id };
   }
 
-  private hasDirectAdmin(grants: SectionDoc['grants']): boolean {
-    return grants.some((g) => g.principalType === 'USER' && g.role === 'ADMINISTER');
+  private hasDirectAdmin(grants: SectionDoc['grants'], now = this.clock.now().getTime()): boolean {
+    return grants.some(
+      (g) =>
+        g.principalType === 'USER' &&
+        g.role === 'ADMINISTER' &&
+        (!g.expiresAt || Date.parse(g.expiresAt) > now),
+    );
   }
 
   async upsertGrant(
@@ -666,12 +706,14 @@ export class SecureSectionService {
       principalId: unknown;
       role: unknown;
       expectedAclVersion: unknown;
+      expiresAt?: unknown;
     },
   ): Promise<GrantList> {
     const p = this.validatePrincipal(input.principalType, input.principalId);
     if (!isRole(input.role)) throw new DomainError('INVALID_REQUEST');
     const role = input.role;
     const expected = parseVersion(input.expectedAclVersion);
+    const expiresAt = parseExpiresAt(input.expiresAt, this.clock.now());
     await this.assertPrincipalExists(p.type, p.id);
     return this.withRetry(async () => {
       const r = await this.requireBound(ctx, 'ADMINISTER', { op: 'acl-write', auditDenied: true });
@@ -679,11 +721,14 @@ export class SecureSectionService {
       if (s.aclVersion !== expected)
         throw new DomainError('CONFLICT', { currentAclVersion: s.aclVersion });
       const existing = s.grants.find((g) => g.principalType === p.type && g.principalId === p.id);
-      if (existing?.role === role) return this.grantList(s);
+      const nextExpiry = input.expiresAt === undefined ? (existing?.expiresAt ?? null) : expiresAt;
+      if (existing?.role === role && (existing.expiresAt ?? null) === nextExpiry) {
+        return this.grantList(s);
+      }
       if (!existing && s.grants.length >= LIMITS.maxGrants) throw new DomainError('RATE_LIMITED');
       const now = this.nowIso();
       const grants = existing
-        ? s.grants.map((g) => (g === existing ? { ...g, role } : g))
+        ? s.grants.map((g) => (g === existing ? { ...g, role, expiresAt: nextExpiry } : g))
         : [
             ...s.grants,
             {
@@ -692,6 +737,7 @@ export class SecureSectionService {
               role,
               addedAt: now,
               addedBy: ctx.accountId,
+              expiresAt,
             },
           ];
       if (!this.hasDirectAdmin(grants)) throw new DomainError('LAST_ADMINISTRATOR');
@@ -708,6 +754,7 @@ export class SecureSectionService {
         principalType: p.type,
         principalId: p.id,
         role,
+        expires: nextExpiry !== null,
         ...(existing ? { previousRole: existing.role } : {}),
       });
       next.auditHead = audit.hash;
@@ -1427,6 +1474,18 @@ function parseReason(v: unknown): string {
     throw new DomainError('INVALID_REQUEST');
   }
   return t;
+}
+
+function parseExpiresAt(v: unknown, now: Date): string | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v !== 'string') throw new DomainError('INVALID_REQUEST');
+  const t = Date.parse(v);
+  if (!Number.isFinite(t) || v !== new Date(t).toISOString()) {
+    throw new DomainError('INVALID_REQUEST');
+  }
+  const max = now.getTime() + MAX_GRANT_TTL_DAYS * 86_400_000;
+  if (t <= now.getTime() || t > max) throw new DomainError('INVALID_REQUEST');
+  return v;
 }
 
 function parseClassification(v: unknown): Classification | null {

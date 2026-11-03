@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
+  GRANT_EXPIRY_PRESETS_DAYS,
   ROLES,
   type AuditList,
   type Diagnostics,
@@ -115,6 +116,7 @@ export function PermissionsPanel({
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<PrincipalHit[]>([]);
   const [role, setRole] = useState<Role>('VIEW');
+  const [ttl, setTtl] = useState<'never' | '7' | '30' | '90'>('never');
   const [pendingAdmin, setPendingAdmin] = useState<PrincipalHit | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<{ type: PrincipalType; id: string } | null>(
     null,
@@ -152,7 +154,13 @@ export function PermissionsPanel({
     else setNotice({ kind: 'err', text: errorText(new ApiError(res.code), t) });
   };
 
-  const upsert = (hit: PrincipalHit, r: Role) =>
+  const expiresAtFor = (preset: 'never' | '7' | '30' | '90'): string | null => {
+    if (preset === 'never') return null;
+    const days = Number(preset);
+    return new Date(Date.now() + days * 86_400_000).toISOString();
+  };
+
+  const upsert = (hit: PrincipalHit, r: Role, expiresAt?: string | null) =>
     apply(async () =>
       unwrap(
         await api.call('upsertGrant', {
@@ -160,6 +168,7 @@ export function PermissionsPanel({
           principalId: hit.principalId,
           role: r,
           expectedAclVersion: (list as GrantList).aclVersion,
+          ...(expiresAt !== undefined ? { expiresAt } : {}),
         }),
       ),
     );
@@ -192,6 +201,8 @@ export function PermissionsPanel({
               {t('perm.user')} / {t('perm.group')}
             </th>
             <th scope="col">{t('nav.permissions')}</th>
+            <th scope="col">{t('perm.expires')}</th>
+            <th scope="col">{t('perm.lastAccess')}</th>
             <th scope="col">
               <span className="ss-sr">{t('action.remove')}</span>
             </th>
@@ -230,6 +241,45 @@ export function PermissionsPanel({
                 </select>
               </td>
               <td>
+                {g.expiresAt ? (
+                  Date.parse(g.expiresAt) > Date.now() ? (
+                    <span>{new Date(g.expiresAt).toLocaleDateString()}</span>
+                  ) : (
+                    <span className="ss-err">
+                      {t('perm.expires.expired', {
+                        when: new Date(g.expiresAt).toLocaleDateString(),
+                      })}
+                    </span>
+                  )
+                ) : (
+                  <span className="ss-muted">{t('perm.expires.never')}</span>
+                )}
+              </td>
+              <td className="ss-muted">
+                {g.lastAccessAt
+                  ? new Date(g.lastAccessAt).toLocaleString()
+                  : t('perm.lastAccess.never')}
+              </td>
+              <td>
+                {g.expiresAt && Date.parse(g.expiresAt) <= Date.now() && (
+                  <button
+                    type="button"
+                    className="ss-btn"
+                    onClick={() =>
+                      void upsert(
+                        {
+                          principalType: g.principalType,
+                          principalId: g.principalId,
+                          label: g.label,
+                        },
+                        g.role,
+                        expiresAtFor('30'),
+                      )
+                    }
+                  >
+                    {t('perm.renew')}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="ss-btn ss-danger"
@@ -334,6 +384,21 @@ export function PermissionsPanel({
             ))}
           </select>
         </label>
+        <label>
+          <span className="ss-sr">{t('perm.expires')}</span>
+          <select
+            value={ttl}
+            onChange={(e) => setTtl(e.target.value as typeof ttl)}
+            aria-label={t('perm.expires')}
+          >
+            <option value="never">{t('perm.expires.never')}</option>
+            {GRANT_EXPIRY_PRESETS_DAYS.map((d) => (
+              <option key={d} value={String(d)}>
+                {t(`perm.expires.in${d}` as 'perm.expires.in7')}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="ss-btn" disabled={query.trim().length < 2}>
           {kind === 'USER' ? t('perm.search.users') : t('perm.search.groups')}
         </button>
@@ -345,7 +410,9 @@ export function PermissionsPanel({
             <button
               type="button"
               className="ss-btn"
-              onClick={() => (role === 'ADMINISTER' ? setPendingAdmin(h) : void upsert(h, role))}
+              onClick={() =>
+                role === 'ADMINISTER' ? setPendingAdmin(h) : void upsert(h, role, expiresAtFor(ttl))
+              }
             >
               {t('action.add')}
             </button>

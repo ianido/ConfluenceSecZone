@@ -37,6 +37,9 @@ export interface GrantRec {
   role: Role;
   addedAt: string;
   addedBy: string;
+  /** Absent or null: never expires. ISO timestamp otherwise. */
+  expiresAt?: string | null;
+  lastAccessAt?: string | null;
 }
 
 export interface AccessRequestRec {
