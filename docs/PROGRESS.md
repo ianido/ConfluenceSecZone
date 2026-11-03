@@ -94,3 +94,8 @@ branch `cursor/secure-sections-forge-build-18af`, never push to protected branch
 - Files: docs/marketplace/* (LISTING, SCREENSHOT_PLAN, PRIVACY_POLICY_DRAFT, EULA_DRAFT, SUPPORT_POLICY, VULNERABILITY_DISCLOSURE, LICENSING_STRATEGY, SCOPES_RATIONALE, DATA_HANDLING), CHANGELOG.md, RELEASE_NOTES.md, docs/FINAL_REPORT.md.
 - Not done (not authorised): no deployment, no listing, no licensing enabled.
 - Final recommendation: **INTERNAL TEST** (see docs/FINAL_REPORT.md).
+
+## UX pack (title, requests, expiry, history)
+
+- Commits: `6672e3a` (meta + editor), `b8bd560` (access requests), `42a36d2` (expiry / last access), `ed59843` (history diff), plus this docs commit.
+- Tests at last run: 18 files / 321 PASS. Wiki not updated (T-WIKI-1) until the UI is deployed and exercised.

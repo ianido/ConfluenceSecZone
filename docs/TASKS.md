@@ -35,5 +35,10 @@
 - [ ] T-REL-2 Third-party notices file generated from the lockfile
 - [ ] T-SEC-1 Replace `read:content-details:confluence` if `forge lint`/S7 shows it is unnecessary
 - [ ] T-SEC-2 Optional: admin export of one account's personal data (supported operation)
-- [ ] T-UX-1 Capture final screenshots on a real site
+- [x] T-UX-2 Title, classification, access summary and editor polish
+- [x] T-UX-3 Access-request flow (denied card + Permissions queue)
+- [x] T-UX-4 Temporary grants, last access
+- [x] T-UX-5 History change notes and visual diff
+- [ ] T-UX-1 Capture final screenshots on a real site (including the new header, request card, expiry columns and history diff)
+- [ ] T-WIKI-1 Update the GitHub wiki after the new UI is deployed and exercised on a real site
 - [ ] T-QA-1 Load test with 200 sections, 500 grants, 150 KB documents (QA-17)

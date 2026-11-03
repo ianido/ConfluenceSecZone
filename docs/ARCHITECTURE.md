@@ -100,6 +100,8 @@ domain operation inside withRetry(4) using transact()
 ```
 
 Denials are generic; `getSection` maps to UI states (UNCONFIGURED, DENIED, UNAVAILABLE, CORRUPTED, READY).
+A user without a grant who can view the page may separately call `getAccessInfo` / `requestAccess` (ADR-0009);
+those return only public title/classification, a few administrator names and the caller's own request.
 
 ## Section binding protocol (summary; ADR-0002)
 

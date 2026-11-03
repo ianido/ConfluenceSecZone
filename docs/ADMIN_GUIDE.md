@@ -32,7 +32,10 @@ membership), `report:personal-data` (Atlassian's mandatory privacy reporting).
 | Administrator | Modify + manage permissions, see activity log, delete the section, reuse/copy references |
 
 A person's effective role is the highest of their own grants and their group grants. There are no deny rules.
-Removing the last individual administrator is blocked.
+Removing the last individual administrator is blocked (an expired administrator does not count).
+
+People without access can request View or Modify from the denied card. Administrators see a queue on the
+Permissions tab. Grants may expire after 7, 30 or 90 days.
 
 ## Copying pages
 

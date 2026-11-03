@@ -6,6 +6,11 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 
 ### Added
 
+- Optional section title and classification (Internal / Confidential / Restricted) on the header, set at creation or later by an administrator. They are visible to anyone who can view the page.
+- Access requests from the denied card (VIEW or MODIFY, optional reason). Administrators review them in Permissions; requests expire after 30 days.
+- Temporary grants with a 7 / 30 / 90-day expiry, a last-access column, and renewal of expired people. An expired administrator does not count as the last administrator.
+- Optional change note on save and a line-level History comparison against the previous version.
+- Editor polish: vector toolbar icons, word count, `Ctrl+S`.
 - Forge macro `secure-section-macro` with Custom UI (React 19, Tiptap 3), resolver, `adfExport` placeholder and daily maintenance trigger.
 - Domain: binding protocol, ACL with VIEW/MODIFY/ADMINISTER, final-administrator rule, revisions, hash-chained audit, retention, privacy anonymisation, site-admin recovery.
 - Storage adapter for Forge Custom Entity Store transactions (not yet executed against a live site).
