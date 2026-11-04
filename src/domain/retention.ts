@@ -70,6 +70,7 @@ export class RetentionService {
       out.auditDeleted += await this.pruneAudit(s, cfg, now);
     }
     await this.saveMeta('retention-cursor', res.nextCursor);
+    if (out.done) await this.saveMeta('retention-swept', this.clock.now().toISOString());
     this.logger.info('retention.sweep', {
       scanned: out.sectionsScanned,
       purged: out.sectionsPurged,

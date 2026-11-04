@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
+  GRANT_EXPIRY_PRESETS_DAYS,
   ROLES,
+  diffDocs,
   type AuditList,
   type Diagnostics,
   type EffectiveAccess,
@@ -11,9 +13,11 @@ import {
   type RichDoc,
   type Role,
 } from '@secure-sections/shared';
+import { RequestsQueue } from './Access';
 import { ApiError, safeCall, unwrap, type Api } from './api';
 import { useT } from './i18n';
 import { RichRenderer } from './Renderer';
+import { Avatar, Pill } from './visual';
 
 function useLoad<T>(load: () => Promise<T>): {
   data: T | null;
@@ -100,7 +104,13 @@ export function RoleLabel({ role }: { role: Role | null }) {
 
 // ------------------------------------------------------------------ Permissions
 
-export function PermissionsPanel({ api }: { api: Api }) {
+export function PermissionsPanel({
+  api,
+  onPending,
+}: {
+  api: Api;
+  onPending?: (n: number) => void;
+}) {
   const t = useT();
   const grants = useLoad(async () => unwrap(await api.call('listGrants', {})));
   const access = useLoad(async () => unwrap(await api.call('getEffectiveAccess', {})));
@@ -108,10 +118,13 @@ export function PermissionsPanel({ api }: { api: Api }) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<PrincipalHit[]>([]);
   const [role, setRole] = useState<Role>('VIEW');
+  const [ttl, setTtl] = useState<'never' | '7' | '30' | '90'>('never');
   const [pendingAdmin, setPendingAdmin] = useState<PrincipalHit | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<{ type: PrincipalType; id: string } | null>(
     null,
   );
+  const [picked, setPicked] = useState<PrincipalHit[]>([]);
+  const [sourceRef, setSourceRef] = useState('');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [current, setCurrent] = useState<GrantList | null>(null);
   const list = current ?? grants.data;
@@ -122,7 +135,9 @@ export function PermissionsPanel({ api }: { api: Api }) {
         setCurrent(await run());
         setNotice({ kind: 'ok', text: t('perm.saved') });
         setHits([]);
+        setPicked([]);
         setQuery('');
+        setSourceRef('');
       } catch (e) {
         const err = e instanceof ApiError ? e : new ApiError('UNAVAILABLE');
         setNotice({ kind: 'err', text: errorText(err, t) });
@@ -145,7 +160,13 @@ export function PermissionsPanel({ api }: { api: Api }) {
     else setNotice({ kind: 'err', text: errorText(new ApiError(res.code), t) });
   };
 
-  const upsert = (hit: PrincipalHit, r: Role) =>
+  const expiresAtFor = (preset: 'never' | '7' | '30' | '90'): string | null => {
+    if (preset === 'never') return null;
+    const days = Number(preset);
+    return new Date(Date.now() + days * 86_400_000).toISOString();
+  };
+
+  const upsert = (hit: PrincipalHit, r: Role, expiresAt?: string | null) =>
     apply(async () =>
       unwrap(
         await api.call('upsertGrant', {
@@ -153,6 +174,7 @@ export function PermissionsPanel({ api }: { api: Api }) {
           principalId: hit.principalId,
           role: r,
           expectedAclVersion: (list as GrantList).aclVersion,
+          ...(expiresAt !== undefined ? { expiresAt } : {}),
         }),
       ),
     );
@@ -166,6 +188,15 @@ export function PermissionsPanel({ api }: { api: Api }) {
     <Panel title={t('perm.title')}>
       <p className="ss-muted">{t('perm.explain')}</p>
       {access.data && <EffectiveBox access={access.data} />}
+      <RequestsQueue
+        api={api}
+        aclVersion={list.aclVersion}
+        {...(onPending ? { onCount: onPending } : {})}
+        onResolved={() => {
+          setCurrent(null);
+          grants.reload();
+        }}
+      />
       <div role="status" aria-live="polite">
         {notice && <p className={notice.kind === 'ok' ? 'ss-ok' : 'ss-err'}>{notice.text}</p>}
       </div>
@@ -176,6 +207,8 @@ export function PermissionsPanel({ api }: { api: Api }) {
               {t('perm.user')} / {t('perm.group')}
             </th>
             <th scope="col">{t('nav.permissions')}</th>
+            <th scope="col">{t('perm.expires')}</th>
+            <th scope="col">{t('perm.lastAccess')}</th>
             <th scope="col">
               <span className="ss-sr">{t('action.remove')}</span>
             </th>
@@ -185,11 +218,19 @@ export function PermissionsPanel({ api }: { api: Api }) {
           {list.grants.map((g) => (
             <tr key={`${g.principalType}:${g.principalId}`}>
               <td>
-                {g.label}{' '}
-                <span className="ss-chip">
-                  {g.principalType === 'USER' ? t('perm.user') : t('perm.group')}
+                <span className="ss-who">
+                  <Avatar name={g.label} />
+                  <span>
+                    {g.label}{' '}
+                    <Pill tone={g.principalType === 'GROUP' ? 'group' : 'muted'}>
+                      {g.principalType === 'USER' ? t('perm.user') : t('perm.group')}
+                    </Pill>
+                    {g.principalType === 'USER' && g.principalId === list.ownerAccountId && (
+                      <Pill tone="owner">{t('perm.owner')}</Pill>
+                    )}
+                    {!g.active && <Pill tone="danger">{t('perm.inactive')}</Pill>}
+                  </span>
                 </span>
-                {!g.active && <span className="ss-chip ss-chip-warn">{t('perm.inactive')}</span>}
               </td>
               <td>
                 <select
@@ -214,6 +255,45 @@ export function PermissionsPanel({ api }: { api: Api }) {
                 </select>
               </td>
               <td>
+                {g.expiresAt ? (
+                  Date.parse(g.expiresAt) > Date.now() ? (
+                    <Pill tone="warn">{new Date(g.expiresAt).toLocaleDateString()}</Pill>
+                  ) : (
+                    <Pill tone="danger">
+                      {t('perm.expires.expired', {
+                        when: new Date(g.expiresAt).toLocaleDateString(),
+                      })}
+                    </Pill>
+                  )
+                ) : (
+                  <span className="ss-muted">{t('perm.expires.never')}</span>
+                )}
+              </td>
+              <td className="ss-muted">
+                {g.lastAccessAt
+                  ? new Date(g.lastAccessAt).toLocaleString()
+                  : t('perm.lastAccess.never')}
+              </td>
+              <td>
+                {g.expiresAt && Date.parse(g.expiresAt) <= Date.now() && (
+                  <button
+                    type="button"
+                    className="ss-btn"
+                    onClick={() =>
+                      void upsert(
+                        {
+                          principalType: g.principalType,
+                          principalId: g.principalId,
+                          label: g.label,
+                        },
+                        g.role,
+                        expiresAtFor('30'),
+                      )
+                    }
+                  >
+                    {t('perm.renew')}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="ss-btn ss-danger"
@@ -318,24 +398,130 @@ export function PermissionsPanel({ api }: { api: Api }) {
             ))}
           </select>
         </label>
+        <label>
+          <span className="ss-sr">{t('perm.expires')}</span>
+          <select
+            value={ttl}
+            onChange={(e) => setTtl(e.target.value as typeof ttl)}
+            aria-label={t('perm.expires')}
+          >
+            <option value="never">{t('perm.expires.never')}</option>
+            {GRANT_EXPIRY_PRESETS_DAYS.map((d) => (
+              <option key={d} value={String(d)}>
+                {t(`perm.expires.in${d}` as 'perm.expires.in7')}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="ss-btn" disabled={query.trim().length < 2}>
           {kind === 'USER' ? t('perm.search.users') : t('perm.search.groups')}
         </button>
       </form>
       <ul className="ss-hits">
-        {hits.map((h) => (
-          <li key={`${h.principalType}:${h.principalId}`}>
-            {h.label}
-            <button
-              type="button"
-              className="ss-btn"
-              onClick={() => (role === 'ADMINISTER' ? setPendingAdmin(h) : void upsert(h, role))}
-            >
-              {t('action.add')}
-            </button>
-          </li>
-        ))}
+        {hits.map((h) => {
+          const key = `${h.principalType}:${h.principalId}`;
+          const on = picked.some((p) => `${p.principalType}:${p.principalId}` === key);
+          return (
+            <li key={key}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() =>
+                    setPicked((cur) =>
+                      on
+                        ? cur.filter((p) => `${p.principalType}:${p.principalId}` !== key)
+                        : [...cur, h],
+                    )
+                  }
+                />{' '}
+                {h.label}
+              </label>
+              <button
+                type="button"
+                className="ss-btn"
+                onClick={() =>
+                  role === 'ADMINISTER'
+                    ? setPendingAdmin(h)
+                    : void upsert(h, role, expiresAtFor(ttl))
+                }
+              >
+                {t('action.add')}
+              </button>
+            </li>
+          );
+        })}
       </ul>
+      {picked.length > 0 && role !== 'ADMINISTER' && (
+        <button
+          type="button"
+          className="ss-btn ss-primary"
+          onClick={() =>
+            apply(async () => {
+              let version = list.aclVersion;
+              let last = list;
+              const expiresAt = expiresAtFor(ttl);
+              for (const h of picked) {
+                last = unwrap(
+                  await api.call('upsertGrant', {
+                    principalType: h.principalType,
+                    principalId: h.principalId,
+                    role,
+                    expectedAclVersion: version,
+                    expiresAt,
+                  }),
+                );
+                version = last.aclVersion;
+              }
+              return last;
+            })
+          }
+        >
+          {t('perm.multiAdd')} ({picked.length})
+        </button>
+      )}
+      <h3>{t('perm.copy')}</h3>
+      <form
+        className="ss-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void apply(async () =>
+            unwrap(
+              await api.call('copyGrants', {
+                sourceRef: sourceRef.trim(),
+                expectedAclVersion: list.aclVersion,
+              }),
+            ),
+          );
+        }}
+      >
+        <label>
+          {t('perm.copy.ref')}
+          <input
+            value={sourceRef}
+            maxLength={64}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setSourceRef(e.target.value)}
+          />
+        </label>
+        <button type="submit" className="ss-btn" disabled={sourceRef.trim() === ''}>
+          {t('perm.copy.action')}
+        </button>
+      </form>
+      <h3>{t('perm.seed')}</h3>
+      <p className="ss-muted">{t('perm.seed.note')}</p>
+      <button
+        type="button"
+        className="ss-btn"
+        onClick={() =>
+          void apply(async () =>
+            unwrap(await api.call('seedPageRestrictions', { expectedAclVersion: list.aclVersion })),
+          )
+        }
+      >
+        {t('perm.seed')}
+      </button>
     </Panel>
   );
 }
@@ -375,6 +561,16 @@ export function HistoryPanel({
   const t = useT();
   const hist = useLoad<RevisionList>(async () => unwrap(await api.call('listRevisions', {})));
   const [preview, setPreview] = useState<{ version: number; doc: RichDoc } | null>(null);
+  const [compare, setCompare] = useState<{
+    from: number;
+    to: number;
+    lines: ReturnType<typeof diffDocs>;
+    left: RichDoc;
+    right: RichDoc;
+  } | null>(null);
+  const [fromVersion, setFromVersion] = useState('');
+  const [toVersion, setToVersion] = useState('');
+  const [tagDraft, setTagDraft] = useState<Record<number, string>>({});
   const [confirm, setConfirm] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -382,17 +578,122 @@ export function HistoryPanel({
   if (hist.error || !hist.data)
     return <ErrorBox error={hist.error ?? new ApiError('UNAVAILABLE')} onRetry={hist.reload} />;
   const fmt = (iso: string) => new Date(iso).toLocaleString();
+  const current = hist.data.revisions.reduce((max, r) => Math.max(max, r.version), 0);
+  const openCompare = async (from: number, to: number) => {
+    const [a, b] = await Promise.all([
+      safeCall(api, 'getRevision', { version: from }),
+      safeCall(api, 'getRevision', { version: to }),
+    ]);
+    if (a.ok && b.ok) {
+      setCompare({
+        from,
+        to,
+        lines: diffDocs(a.data.doc, b.data.doc),
+        left: a.data.doc,
+        right: b.data.doc,
+      });
+    } else setError(t('error.generic'));
+  };
 
   return (
     <Panel title={t('history.title')}>
       {hist.data.revisions.length <= 1 && <p className="ss-muted">{t('history.empty')}</p>}
+      {hist.data.revisions.length > 1 && (
+        <form
+          className="ss-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void openCompare(Number(fromVersion), Number(toVersion));
+          }}
+        >
+          <label>
+            {t('history.compare.pick')}
+            <select
+              aria-label={t('history.compare.from')}
+              value={fromVersion}
+              onChange={(e) => setFromVersion(e.target.value)}
+            >
+              <option value="">{t('history.compare.from')}</option>
+              {hist.data.revisions.map((r) => (
+                <option key={`from-${r.version}`} value={r.version}>
+                  v{r.version}
+                  {r.tag ? ` · ${r.tag}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="ss-sr">{t('history.compare.to')}</span>
+            <select
+              aria-label={t('history.compare.to')}
+              value={toVersion}
+              onChange={(e) => setToVersion(e.target.value)}
+            >
+              <option value="">{t('history.compare.to')}</option>
+              {hist.data.revisions.map((r) => (
+                <option key={`to-${r.version}`} value={r.version}>
+                  v{r.version}
+                  {r.tag ? ` · ${r.tag}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="ss-btn"
+            disabled={fromVersion === '' || toVersion === '' || fromVersion === toVersion}
+          >
+            {t('history.compare.any')}
+          </button>
+        </form>
+      )}
       <ol className="ss-history">
         {hist.data.revisions.map((r) => (
-          <li key={r.version}>
-            <span>
-              v{r.version} · {fmt(r.createdAt)} · {r.author?.displayName ?? '—'}
+          <li
+            key={r.version}
+            className={r.version === current ? 'ss-version is-current' : 'ss-version'}
+          >
+            <div className="ss-version-head">
+              <strong>v{r.version}</strong>
+              {r.version === current && <Pill tone="ok">{t('history.current')}</Pill>}
+              {r.tag && <Pill tone="warn">{r.tag}</Pill>}
+            </div>
+            <span className="ss-muted">
+              {r.author?.displayName ?? '—'} · {fmt(r.createdAt)}
               {r.restoredFrom ? ` · ↩ v${r.restoredFrom}` : ''}
+              {r.changeNote ? ` · ${r.changeNote}` : ''}
             </span>
+            {canWrite && (
+              <form
+                className="ss-row"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void (async () => {
+                    const res = await safeCall(api, 'setRevisionTag', {
+                      version: r.version,
+                      tag: (tagDraft[r.version] ?? r.tag ?? '').trim() || null,
+                    });
+                    if (res.ok) hist.reload();
+                    else setError(t('error.generic'));
+                  })();
+                }}
+              >
+                <label>
+                  <span className="ss-sr">{t('history.tag')}</span>
+                  <input
+                    aria-label={`${t('history.tag')} v${r.version}`}
+                    maxLength={40}
+                    value={tagDraft[r.version] ?? r.tag ?? ''}
+                    onChange={(e) =>
+                      setTagDraft((cur) => ({ ...cur, [r.version]: e.target.value }))
+                    }
+                  />
+                </label>
+                <button type="submit" className="ss-btn">
+                  {t('history.tag.save')}
+                </button>
+              </form>
+            )}
             <button
               type="button"
               className="ss-btn"
@@ -407,6 +708,15 @@ export function HistoryPanel({
             {canWrite && r.version !== baseVersion && (
               <button type="button" className="ss-btn" onClick={() => setConfirm(r.version)}>
                 {t('action.restore')}
+              </button>
+            )}
+            {r.version > 1 && (
+              <button
+                type="button"
+                className="ss-btn"
+                onClick={() => void openCompare(r.version - 1, r.version)}
+              >
+                {t('history.compare')}
               </button>
             )}
           </li>
@@ -444,6 +754,51 @@ export function HistoryPanel({
           <RichRenderer doc={preview.doc} />
           <button type="button" className="ss-btn" onClick={() => setPreview(null)}>
             {t('action.close')}
+          </button>
+        </div>
+      )}
+      {compare && (
+        <div
+          className="ss-preview"
+          aria-label={t('history.compare.title', { from: compare.from, to: compare.to })}
+        >
+          <h3>{t('history.compare.title', { from: compare.from, to: compare.to })}</h3>
+          <div className="ss-side">
+            <div>
+              <h4>v{compare.from}</h4>
+              <RichRenderer doc={compare.left} />
+            </div>
+            <div>
+              <h4>v{compare.to}</h4>
+              <RichRenderer doc={compare.right} />
+            </div>
+          </div>
+          {compare.lines.every((l) => l.kind === 'equal') ? (
+            <p className="ss-muted">{t('history.compare.empty')}</p>
+          ) : (
+            <>
+              <p className="ss-muted">
+                {t('history.compare.stats', {
+                  added: compare.lines.filter((l) => l.kind === 'add').length,
+                  removed: compare.lines.filter((l) => l.kind === 'del').length,
+                })}
+              </p>
+              <pre
+                className="ss-diff"
+                aria-label={t('history.compare.title', { from: compare.from, to: compare.to })}
+              >
+                {compare.lines.map((l, i) => (
+                  <span key={i} className={`ss-diff-${l.kind}`}>
+                    {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '- ' : '  '}
+                    {l.text || ' '}
+                    {'\n'}
+                  </span>
+                ))}
+              </pre>
+            </>
+          )}
+          <button type="button" className="ss-btn" onClick={() => setCompare(null)}>
+            {t('history.closeCompare')}
           </button>
         </div>
       )}

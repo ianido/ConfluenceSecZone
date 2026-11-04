@@ -1,5 +1,6 @@
 import type { RichDoc } from './editor-schema.js';
 import type { PrincipalType, Role } from './roles.js';
+import type { SectionTemplate } from './templates.js';
 
 /**
  * Typed resolver contract shared by the Custom UI and the Forge resolver.
@@ -28,6 +29,24 @@ export const RESOLVER_FUNCTIONS = [
   'deleteSection',
   'getDiagnostics',
   'recoverSection',
+  'updateMetadata',
+  'getAccessInfo',
+  'requestAccess',
+  'cancelAccessRequest',
+  'listAccessRequests',
+  'resolveAccessRequest',
+  'copyGrants',
+  'seedPageRestrictions',
+  'dismissNotice',
+  'setRevisionTag',
+  'revealSecret',
+  'listMySections',
+  'exportMyAudit',
+  'deleteOrphan',
+  'getAdminOverview',
+  'updateSitePolicy',
+  'recoverUnowned',
+  'listPageSections',
 ] as const;
 export type ResolverFunction = (typeof RESOLVER_FUNCTIONS)[number];
 
@@ -68,6 +87,67 @@ export interface PageCapabilities {
   canEditPage: boolean;
 }
 
+export const CLASSIFICATIONS = ['INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as const;
+export type Classification = (typeof CLASSIFICATIONS)[number];
+
+export function isClassification(value: unknown): value is Classification {
+  return typeof value === 'string' && (CLASSIFICATIONS as readonly string[]).includes(value);
+}
+
+export const TITLE_MAX_LENGTH = 80;
+
+/**
+ * Descriptive metadata of a section. The title and classification are deliberately NOT secret:
+ * they are visible to everyone who can view the page (see docs/SECURITY.md). Never put
+ * confidential text in them.
+ */
+export interface SectionMeta {
+  title: string | null;
+  classification: Classification | null;
+  sharedWith: { users: number; groups: number };
+}
+
+export const REQUESTABLE_ROLES = ['VIEW', 'MODIFY'] as const;
+export type RequestableRole = (typeof REQUESTABLE_ROLES)[number];
+
+export function isRequestableRole(value: unknown): value is RequestableRole {
+  return typeof value === 'string' && (REQUESTABLE_ROLES as readonly string[]).includes(value);
+}
+
+export const REQUEST_REASON_MAX_LENGTH = 280;
+
+export interface MyAccessRequest {
+  role: RequestableRole;
+  reason: string;
+  requestedAt: string;
+}
+
+/**
+ * What a page viewer WITHOUT access may learn about a section: the public title and
+ * classification, up to a few administrator names (so they know whom to ask) and their own
+ * pending request. Never content, grants, or counts.
+ */
+export interface AccessInfo {
+  title: string | null;
+  classification: Classification | null;
+  administrators: UserSummary[];
+  myRequest: MyAccessRequest | null;
+}
+
+export interface AccessRequestItem {
+  accountId: string;
+  displayName: string;
+  active: boolean;
+  role: RequestableRole;
+  reason: string;
+  requestedAt: string;
+}
+
+export interface AccessRequestList {
+  requests: AccessRequestItem[];
+  aclVersion: number;
+}
+
 export type SectionView =
   | { state: 'UNCONFIGURED'; canCreate: boolean }
   | { state: 'DENIED' }
@@ -80,7 +160,17 @@ export type SectionView =
       canEditPage: boolean;
       content: ContentPayload;
       aclVersion: number;
+      meta: SectionMeta;
+      /** In-app note that this caller was granted access. Null when there is nothing to show. */
+      notice: GrantNotice | null;
+      protection: ProtectionFlags;
     };
+
+export interface GrantNotice {
+  role: Role;
+  addedByName: string;
+  at: string;
+}
 
 export interface EffectiveAccess {
   role: Role | null;
@@ -88,6 +178,9 @@ export interface EffectiveAccess {
   sources: Array<{ via: 'USER' | 'GROUP'; principalId: string; label: string; role: Role }>;
   groupResolution: 'OK' | 'DEGRADED';
 }
+
+export const GRANT_EXPIRY_PRESETS_DAYS = [7, 30, 90] as const;
+export const MAX_GRANT_TTL_DAYS = 365;
 
 export interface Grant {
   principalType: PrincipalType;
@@ -97,6 +190,9 @@ export interface Grant {
   addedAt: string;
   addedBy: string;
   active: boolean;
+  /** ISO timestamp; null means the grant does not expire. */
+  expiresAt: string | null;
+  lastAccessAt: string | null;
 }
 
 export interface GrantList {
@@ -111,12 +207,17 @@ export interface PrincipalHit {
   label: string;
 }
 
+export const CHANGE_NOTE_MAX_LENGTH = 140;
+export const REVISION_TAG_MAX_LENGTH = 40;
+
 export interface RevisionSummary {
   version: number;
   createdAt: string;
   author: UserSummary | null;
   restoredFrom: number | null;
   bytes: number;
+  changeNote: string | null;
+  tag: string | null;
 }
 
 export interface RevisionList {
@@ -136,6 +237,13 @@ export type AuditAction =
   | 'SECTION_COPY'
   | 'SECTION_DELETE'
   | 'ADMIN_RECOVERY'
+  | 'METADATA_UPDATE'
+  | 'ACCESS_REQUEST'
+  | 'ACCESS_REQUEST_CANCEL'
+  | 'ACCESS_REQUEST_APPROVE'
+  | 'ACCESS_REQUEST_REJECT'
+  | 'REVISION_TAG'
+  | 'SECRET_REVEAL'
   | 'ACCESS_DENIED'
   | 'RETENTION_PURGE';
 
@@ -161,6 +269,95 @@ export interface Diagnostics {
   retention: RetentionConfig;
 }
 
+export interface ClassPolicy {
+  id: Classification;
+  watermark: boolean;
+  /** Minutes of inactivity before the reader must reload. Null disables auto-lock. */
+  autoLockMinutes: number | null;
+  protectCopy: boolean;
+}
+
+export type WhoMayCreate = 'PAGE_EDITORS' | 'SITE_ADMINS';
+
+/**
+ * Site-wide knobs. Reader protection derived from this is deterrence only:
+ * a watermark and a hidden selection do not stop a determined reader.
+ */
+export interface SitePolicy {
+  allowRequests: boolean;
+  maxGrantDays: number;
+  requireChangeNote: boolean;
+  /** When true, a section that already has content opens locked for every role. */
+  lockByDefault: boolean;
+  whoMayCreate: WhoMayCreate;
+  classes: ClassPolicy[];
+}
+
+export type PageStatus = 'OK' | 'MISSING' | 'UNKNOWN';
+
+export interface MySectionRow {
+  sectionId: string;
+  title: string | null;
+  classification: Classification | null;
+  pageId: string;
+  spaceKey: string | null;
+  pageStatus: PageStatus;
+  role: Role;
+  sharedUsers: number;
+  updatedAt: string;
+}
+
+export interface MySections {
+  rows: MySectionRow[];
+  truncated: boolean;
+  kpis: {
+    administered: number;
+    pendingRequests: number;
+    expiringGrants: number;
+    inactive: number;
+  };
+  /** Recent audit metadata only. Never content, reasons or document text. */
+  activity: Array<{ at: string; action: string; actor: string; title: string | null }>;
+}
+
+export interface PageSectionRow {
+  localId: string;
+  title: string | null;
+  classification: Classification | null;
+  role: Role | null;
+}
+
+export interface InitialGrant {
+  principalType: PrincipalType;
+  principalId: string;
+  role: Role;
+}
+
+export interface AdminOverview {
+  sectionCount: number;
+  truncated: boolean;
+  noAdmin: Array<{ sectionId: string; title: string | null; pageId: string }>;
+  orphans: Array<{ sectionId: string; title: string | null; pageId: string }>;
+  lastSweep: string | null;
+  policy: SitePolicy;
+  retention: RetentionConfig;
+}
+
+export interface AuditExport {
+  csv: string;
+  rows: number;
+  truncated: boolean;
+}
+
+export interface ProtectionFlags {
+  watermark: boolean;
+  autoLockMinutes: number | null;
+  protectCopy: boolean;
+  viewerName: string;
+  /** Copied from the site policy so the macro can lock without a second request. */
+  lockByDefault: boolean;
+}
+
 export interface RetentionConfig {
   revisionsKeep: number;
   revisionsMaxAgeDays: number;
@@ -170,9 +367,17 @@ export interface RetentionConfig {
 
 export interface RequestMap {
   getSection: { req: Record<string, never>; res: SectionView };
-  createSection: { req: Record<string, never>; res: Result<SectionView> };
+  createSection: {
+    req: {
+      title?: string | null;
+      classification?: Classification | null;
+      template?: SectionTemplate | null;
+      initialGrants?: InitialGrant[];
+    };
+    res: Result<SectionView>;
+  };
   saveContent: {
-    req: { doc: unknown; baseVersion: number };
+    req: { doc: unknown; baseVersion: number; changeNote?: string | null };
     res: Result<{ content: ContentPayload }>;
   };
   listRevisions: { req: { cursor?: string | null }; res: Result<RevisionList> };
@@ -196,6 +401,7 @@ export interface RequestMap {
       principalId: string;
       role: Role;
       expectedAclVersion: number;
+      expiresAt?: string | null;
     };
     res: Result<GrantList>;
   };
@@ -216,6 +422,62 @@ export interface RequestMap {
   recoverSection: {
     req: { newAdministratorAccountId: string; confirm: string };
     res: Result<{ recovered: true }>;
+  };
+  getAccessInfo: { req: Record<string, never>; res: Result<AccessInfo> };
+  requestAccess: {
+    req: { role: RequestableRole; reason?: string };
+    res: Result<AccessInfo>;
+  };
+  cancelAccessRequest: { req: Record<string, never>; res: Result<AccessInfo> };
+  listAccessRequests: { req: Record<string, never>; res: Result<AccessRequestList> };
+  resolveAccessRequest: {
+    req: {
+      accountId: string;
+      decision: 'APPROVE' | 'REJECT';
+      role?: RequestableRole;
+      expectedAclVersion: number;
+    };
+    res: Result<AccessRequestList>;
+  };
+  updateMetadata: {
+    req: { title: string | null; classification: Classification | null };
+    res: Result<SectionMeta>;
+  };
+  copyGrants: {
+    req: { sourceRef: string; expectedAclVersion: number };
+    res: Result<GrantList>;
+  };
+  seedPageRestrictions: {
+    req: { expectedAclVersion: number };
+    res: Result<GrantList>;
+  };
+  dismissNotice: { req: Record<string, never>; res: Result<{ dismissed: true }> };
+  setRevisionTag: {
+    req: { version: number; tag: string | null };
+    res: Result<RevisionSummary>;
+  };
+  revealSecret: {
+    req: { label?: string | null };
+    res: Result<{ recorded: true }>;
+  };
+  listMySections: { req: Record<string, never>; res: Result<MySections> };
+  exportMyAudit: { req: Record<string, never>; res: Result<AuditExport> };
+  deleteOrphan: {
+    req: { sectionId: string; confirm: 'DELETE' };
+    res: Result<{ deleted: true }>;
+  };
+  getAdminOverview: { req: Record<string, never>; res: Result<AdminOverview> };
+  updateSitePolicy: {
+    req: { policy: SitePolicy; retention: RetentionConfig };
+    res: Result<AdminOverview>;
+  };
+  recoverUnowned: {
+    req: { sectionId: string; newAdministratorAccountId: string; confirm: string };
+    res: Result<{ recovered: true }>;
+  };
+  listPageSections: {
+    req: Record<string, never>;
+    res: Result<{ sections: PageSectionRow[] }>;
   };
 }
 

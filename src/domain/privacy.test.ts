@@ -18,6 +18,20 @@ async function world() {
   return w;
 }
 
+describe('privacy: pending access requests', () => {
+  it('erases a closed account from pending requests', async () => {
+    const w = makeWorld();
+    for (const u of ['alice', 'carol'])
+      w.gateway.addUser(u).setPage('1001', u, { canView: true, canEdit: true });
+    await w.service.createSection(alice);
+    await w.service.requestAccess(ctxFor('carol'), { role: 'VIEW', reason: 'please' });
+    w.privacyGateway.closed.add('carol');
+    await w.privacy.sweep();
+    expect(JSON.stringify(w.store.dump())).not.toContain('"carol"');
+    expect((await w.service.listAccessRequests(alice)).requests).toEqual([]);
+  });
+});
+
 describe('privacy: closed accounts', () => {
   it('reports stored accountIds and anonymises closed ones everywhere, keeping the chain verifiable', async () => {
     const w = await world();

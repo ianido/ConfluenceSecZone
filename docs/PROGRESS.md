@@ -1,7 +1,7 @@
 # Progress log
 
-Test counts at last full run (2026-11-01 UTC): backend project 10 files / 210 tests PASS; macro-ui project 3 files / 21 tests PASS;
-Playwright 6 tests PASS (UI harness, not Forge). `npm run verify` exit 0. `npm run audit:deps` exit 0 (6 moderate remain).
+Test counts at last full `npm run verify` (2026-11-03, 5:19 AM America/New_York): vitest 23 files / 376 tests PASS.
+Playwright 6 tests PASS (UI harness, not Forge). `npm run verify` exit 0. `npm run audit:deps` was not re-run (no dependency change; the previous result was exit 0 with 6 moderate remaining).
 Not executed: `forge lint` (B-001), all real-site spikes (B-002).
 
 Honest labelling: "OFFLINE" = against the in-memory store and fake Confluence; these prove our logic, not Forge behaviour.
@@ -94,3 +94,15 @@ branch `cursor/secure-sections-forge-build-18af`, never push to protected branch
 - Files: docs/marketplace/* (LISTING, SCREENSHOT_PLAN, PRIVACY_POLICY_DRAFT, EULA_DRAFT, SUPPORT_POLICY, VULNERABILITY_DISCLOSURE, LICENSING_STRATEGY, SCOPES_RATIONALE, DATA_HANDLING), CHANGELOG.md, RELEASE_NOTES.md, docs/FINAL_REPORT.md.
 - Not done (not authorised): no deployment, no listing, no licensing enabled.
 - Final recommendation: **INTERNAL TEST** (see docs/FINAL_REPORT.md).
+
+## UX pack (title, requests, expiry, history)
+
+- Commits: `6672e3a` (meta + editor), `b8bd560` (access requests), `42a36d2` (expiry / last access), `ed59843` (history diff), `4220b11` (docs), `d2d58a1` (e2e Edit exact).
+- Wiki not updated (T-WIKI-1) until the UI is deployed and exercised.
+
+## UX pack (editor nodes through templates)
+
+- Commits on `feat/title-requests-expiry`: `b1ba7ff` (editor nodes), `96017be` (copy, seed, notices), `c72e026` (labels and side-by-side), `6dc3beb` (reader deterrence), `1be215e` (My secure sections), `0929c9b` (site settings), `e58e629` (templates and byline), `9956df5` (typecheck fixes), plus the docs commit that records them.
+- New scopes: `read:content.restriction:confluence`, `read:page:confluence`. Admin re-consent required. Not exercised on a live site.
+- `npm run verify` exit 0: vitest 23 files / 376 tests PASS, production build and manifest policy PASS. `npm run test:e2e` 6 PASS.
+- Wiki still not updated (T-WIKI-1). Screenshots on a real site still open (T-UX-1). T-OPS-2 is implemented offline.

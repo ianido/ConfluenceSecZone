@@ -38,6 +38,26 @@ modules:
         function: resolver
       adfExport:
         function: adf-export
+  confluence:contentBylineItem:
+    - key: secure-sections-byline
+      resource: macro-ui
+      resolver:
+        function: resolver
+      title: Secure sections
+      tooltip: Secure sections on this page
+  confluence:globalSettings:
+    - key: secure-sections-admin
+      resource: macro-ui
+      resolver:
+        function: resolver
+      title: Secure Sections
+  confluence:globalPage:
+    - key: secure-sections-home
+      resource: macro-ui
+      resolver:
+        function: resolver
+      title: My secure sections
+      route: secure-sections
   scheduledTrigger:
     - key: maintenance-daily
       function: maintenance
@@ -62,3 +82,5 @@ permissions:
     - read:confluence-user
     - read:confluence-groups
     - read:content-details:confluence
+    - read:content.restriction:confluence
+    - read:page:confluence

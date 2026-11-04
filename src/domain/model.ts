@@ -1,4 +1,12 @@
-import type { AuditAction, PrincipalType, RetentionConfig, Role } from '@secure-sections/shared';
+import {
+  MAX_GRANT_TTL_DAYS,
+  type AuditAction,
+  type Classification,
+  type PrincipalType,
+  type RetentionConfig,
+  type Role,
+  type SitePolicy,
+} from '@secure-sections/shared';
 import type { DocKeyIndex } from '../ports/store';
 
 export const SCHEMA_VERSION = 1;
@@ -12,7 +20,25 @@ export const LIMITS = {
   revisionPageSize: 25,
   principalSearchLimit: 20,
   maxGroupPages: 10,
+  maxPendingRequests: 50,
+  maxAdminNamesShown: 5,
+  maxNotices: 20,
 } as const;
+
+export const REQUEST_TTL_DAYS = 30;
+
+export const DEFAULT_SITE_POLICY: SitePolicy = {
+  allowRequests: true,
+  maxGrantDays: MAX_GRANT_TTL_DAYS,
+  requireChangeNote: false,
+  lockByDefault: true,
+  whoMayCreate: 'PAGE_EDITORS',
+  classes: [
+    { id: 'INTERNAL', watermark: false, autoLockMinutes: null, protectCopy: false },
+    { id: 'CONFIDENTIAL', watermark: false, autoLockMinutes: null, protectCopy: false },
+    { id: 'RESTRICTED', watermark: true, autoLockMinutes: 5, protectCopy: true },
+  ],
+};
 
 export const DEFAULT_RETENTION: RetentionConfig = {
   revisionsKeep: 50,
@@ -27,6 +53,16 @@ export interface GrantRec {
   role: Role;
   addedAt: string;
   addedBy: string;
+  /** Absent or null: never expires. ISO timestamp otherwise. */
+  expiresAt?: string | null;
+  lastAccessAt?: string | null;
+}
+
+export interface AccessRequestRec {
+  accountId: string;
+  role: 'VIEW' | 'MODIFY';
+  reason: string;
+  requestedAt: string;
 }
 
 export interface BindingRef {
@@ -51,6 +87,13 @@ export interface SectionDoc {
   grants: GrantRec[];
   bindings: BindingRef[];
   auditHead: string;
+  /** Optional descriptive metadata; absent on sections created before it existed. */
+  title?: string | null;
+  classification?: Classification | null;
+  /** Pending access requests, bounded by LIMITS.maxPendingRequests and REQUEST_TTL_DAYS. */
+  requests?: AccessRequestRec[];
+  /** In-app notices for people who were just granted access. Not a Confluence notification. */
+  notices?: Array<{ accountId: string; role: Role; addedBy: string; at: string }>;
 }
 
 export interface BindingDoc {
@@ -74,6 +117,8 @@ export interface RevisionDoc {
   authorAccountId: string;
   createdAt: string;
   restoredFrom: number | null;
+  changeNote?: string | null;
+  tag?: string | null;
 }
 
 export type AuditMeta = Record<string, string | number | boolean | null>;

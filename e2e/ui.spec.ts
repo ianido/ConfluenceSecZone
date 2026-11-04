@@ -47,10 +47,11 @@ test('author creates, edits and shares a section; unauthorised editor sees nothi
   await page.screenshot({ path: 'docs/screenshots/01-setup-wizard.png' });
   await page.getByRole('button', { name: 'Set up secure section' }).click();
 
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.locator('.ss-editor').click();
   await page.keyboard.type(SECRET);
   await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByText(SECRET)).toBeVisible();
   await page.screenshot({ path: 'docs/screenshots/02-content-view.png' });
   await axe(page);
@@ -59,7 +60,7 @@ test('author creates, edits and shares a section; unauthorised editor sees nothi
   await open(bob, 'bob');
   await expect(bob.getByText('This section is protected')).toBeVisible();
   expect(await bob.content()).not.toContain(SECRET);
-  expect(await bob.getByRole('button', { name: 'Edit' }).count()).toBe(0);
+  expect(await bob.getByRole('button', { name: 'Edit', exact: true }).count()).toBe(0);
   await bob.screenshot({ path: 'docs/screenshots/03-denied.png' });
   await axe(bob);
 
@@ -75,8 +76,9 @@ test('author creates, edits and shares a section; unauthorised editor sees nothi
   await axe(page);
 
   await bob.reload();
+  await bob.getByRole('button', { name: 'Unlock' }).click();
   await expect(bob.getByText(SECRET)).toBeVisible();
-  expect(await bob.getByRole('button', { name: 'Edit' }).count()).toBe(0);
+  expect(await bob.getByRole('button', { name: 'Edit', exact: true }).count()).toBe(0);
 });
 
 test('editor hostile paste: scripts and unsafe links are never rendered or stored', async ({
@@ -85,7 +87,7 @@ test('editor hostile paste: scripts and unsafe links are never rendered or store
 }) => {
   await open(page, 'alice');
   await page.getByRole('button', { name: 'Set up secure section' }).click();
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.locator('.ss-editor').click();
   await page.evaluate(() => {
     const dt = new DataTransfer();
@@ -100,6 +102,7 @@ test('editor hostile paste: scripts and unsafe links are never rendered or store
       );
   });
   await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByText('safe')).toBeVisible();
   expect(
     await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
@@ -118,7 +121,7 @@ test('removed access is reflected on reload and the stale view shows no content'
 }) => {
   await open(page, 'alice');
   await page.getByRole('button', { name: 'Set up secure section' }).click();
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.locator('.ss-editor').click();
   await page.keyboard.type(SECRET);
   await page.getByRole('button', { name: 'Save' }).click();
@@ -133,6 +136,7 @@ test('removed access is reflected on reload and the stale view shows no content'
 
   const bob = await (await browser.newContext()).newPage();
   await open(bob, 'bob');
+  await bob.getByRole('button', { name: 'Unlock' }).click();
   await expect(bob.getByText(SECRET)).toBeVisible();
 
   await page

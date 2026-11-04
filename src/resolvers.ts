@@ -6,7 +6,12 @@ import {
   type ResponseOf,
   type SectionView,
 } from '@secure-sections/shared';
-import { parseResolverContext, type TrustedContext } from './domain/context';
+import {
+  parseResolverContext,
+  parseSiteContext,
+  type SiteContext,
+  type TrustedContext,
+} from './domain/context';
 import { DomainError } from './domain/errors';
 import { CorruptedContentError, type SecureSectionService } from './domain/service';
 import { GatewayError } from './ports/confluence';
@@ -72,6 +77,30 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
       }
     };
 
+  const guardedSite =
+    <
+      K extends
+        | 'listMySections'
+        | 'exportMyAudit'
+        | 'deleteOrphan'
+        | 'getAdminOverview'
+        | 'updateSitePolicy'
+        | 'recoverUnowned'
+        | 'listPageSections',
+    >(
+      fn: K,
+      run: (ctx: SiteContext, p: Record<string, unknown>) => Promise<unknown>,
+    ): Handler<K> =>
+    async (req) => {
+      const ctx = parseSiteContext(req.context);
+      if (!ctx) return { ok: false, code: 'UNAVAILABLE' } as ResponseOf<K>;
+      try {
+        return { ok: true, data: await run(ctx, payloadOf(req)) } as ResponseOf<K>;
+      } catch (e) {
+        return toFailure(e, fn, logger) as ResponseOf<K>;
+      }
+    };
+
   const handlers: Handlers = {
     async getSection(req): Promise<SectionView> {
       const ctx = parseResolverContext(req.context);
@@ -84,8 +113,15 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
         return f.code === 'DENIED' ? { state: 'DENIED' } : { state: 'UNAVAILABLE' };
       }
     },
-    createSection: guarded('createSection', (ctx) => service.createSection(ctx)),
-    saveContent: guarded('saveContent', (ctx, p) => service.saveContent(ctx, p.doc, p.baseVersion)),
+    createSection: guarded('createSection', (ctx, p) =>
+      service.createSection(ctx, p.title, p.classification, {
+        template: p.template,
+        initialGrants: p.initialGrants,
+      }),
+    ),
+    saveContent: guarded('saveContent', (ctx, p) =>
+      service.saveContent(ctx, p.doc, p.baseVersion, p.changeNote),
+    ),
     listRevisions: guarded('listRevisions', (ctx, p) => service.listRevisions(ctx, p.cursor)),
     getRevision: guarded('getRevision', (ctx, p) => service.getRevision(ctx, p.version)),
     restoreRevision: guarded('restoreRevision', (ctx, p) =>
@@ -102,6 +138,7 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
         principalId: p.principalId,
         role: p.role,
         expectedAclVersion: p.expectedAclVersion,
+        expiresAt: p.expiresAt,
       }),
     ),
     revokeGrant: guarded('revokeGrant', (ctx, p) =>
@@ -120,6 +157,47 @@ export function createHandlers(service: SecureSectionService, logger: Logger): H
     copyHere: guarded('copyHere', (ctx, p) => service.copyHere(ctx, p.sourceRef)),
     deleteSection: guarded('deleteSection', (ctx, p) => service.deleteSection(ctx, p.confirm)),
     getDiagnostics: guarded('getDiagnostics', (ctx) => service.getDiagnostics(ctx)),
+    getAccessInfo: guarded('getAccessInfo', (ctx) => service.getAccessInfo(ctx)),
+    requestAccess: guarded('requestAccess', (ctx, p) =>
+      service.requestAccess(ctx, { role: p.role, reason: p.reason }),
+    ),
+    cancelAccessRequest: guarded('cancelAccessRequest', (ctx) => service.cancelAccessRequest(ctx)),
+    listAccessRequests: guarded('listAccessRequests', (ctx) => service.listAccessRequests(ctx)),
+    resolveAccessRequest: guarded('resolveAccessRequest', (ctx, p) =>
+      service.resolveAccessRequest(ctx, {
+        accountId: p.accountId,
+        decision: p.decision,
+        role: p.role,
+        expectedAclVersion: p.expectedAclVersion,
+      }),
+    ),
+    updateMetadata: guarded('updateMetadata', (ctx, p) =>
+      service.updateMetadata(ctx, { title: p.title, classification: p.classification }),
+    ),
+    copyGrants: guarded('copyGrants', (ctx, p) =>
+      service.copyGrants(ctx, p.sourceRef, p.expectedAclVersion),
+    ),
+    seedPageRestrictions: guarded('seedPageRestrictions', (ctx, p) =>
+      service.seedPageRestrictions(ctx, p.expectedAclVersion),
+    ),
+    dismissNotice: guarded('dismissNotice', (ctx) => service.dismissNotice(ctx)),
+    setRevisionTag: guarded('setRevisionTag', (ctx, p) =>
+      service.setRevisionTag(ctx, p.version, p.tag),
+    ),
+    revealSecret: guarded('revealSecret', (ctx, p) => service.revealSecret(ctx, p.label)),
+    listMySections: guardedSite('listMySections', (ctx) => service.listMySections(ctx)),
+    exportMyAudit: guardedSite('exportMyAudit', (ctx) => service.exportMyAudit(ctx)),
+    deleteOrphan: guardedSite('deleteOrphan', (ctx, p) =>
+      service.deleteOrphan(ctx, p.sectionId, p.confirm),
+    ),
+    getAdminOverview: guardedSite('getAdminOverview', (ctx) => service.getAdminOverview(ctx)),
+    updateSitePolicy: guardedSite('updateSitePolicy', (ctx, p) =>
+      service.updateSitePolicy(ctx, p.policy, p.retention),
+    ),
+    recoverUnowned: guardedSite('recoverUnowned', (ctx, p) =>
+      service.recoverUnowned(ctx, p.sectionId, p.newAdministratorAccountId, p.confirm),
+    ),
+    listPageSections: guardedSite('listPageSections', (ctx) => service.listPageSections(ctx)),
     recoverSection: guarded('recoverSection', (ctx, p) =>
       service.recoverSection(ctx, {
         newAdministratorAccountId: p.newAdministratorAccountId,

@@ -66,6 +66,28 @@ describe('validateDoc', () => {
     expect(safeValidateDoc(rich)).toMatchObject({ ok: true });
   });
 
+  it('accepts callouts, data-url images, mentions and secret fields', () => {
+    const png = `data:image/png;base64,${'A'.repeat(8)}==`;
+    const rich = doc(
+      {
+        type: 'callout',
+        attrs: { tone: 'warn' },
+        content: [p('careful')],
+      },
+      { type: 'image', attrs: { src: png, alt: 'diagram' } },
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'mention', attrs: { accountId: 'bob', label: 'Bob' } },
+          { type: 'secret', attrs: { label: 'Password', value: 's3cret' } },
+        ],
+      },
+    );
+    const out = safeValidateDoc(rich);
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(docIsEmpty(out.doc)).toBe(false);
+  });
+
   const rejects: [string, unknown, string][] = [
     ['null', null, 'NOT_AN_OBJECT'],
     ['array', [], 'NOT_AN_OBJECT'],
@@ -78,7 +100,12 @@ describe('validateDoc', () => {
       JSON.parse('{"type":"doc","content":[{"type":"paragraph"}],"__proto__":{"x":1}}'),
       'BAD_ATTRS',
     ],
-    ['unknown node (image)', doc({ type: 'image', attrs: { src: 'https://x' } }), 'UNKNOWN_NODE'],
+    ['remote image', doc({ type: 'image', attrs: { src: 'https://x' } }), 'UNSAFE_URL'],
+    [
+      'scriptable image',
+      doc({ type: 'image', attrs: { src: 'javascript:alert(1)' } }),
+      'UNSAFE_URL',
+    ],
     ['unknown node (script)', doc({ type: 'script' }), 'UNKNOWN_NODE'],
     ['html node', doc({ type: 'html', content: '<img src=x onerror=alert(1)>' }), 'UNKNOWN_NODE'],
     ['unknown mark', doc(p('a', [{ type: 'textStyle', attrs: { color: 'red' } }])), 'UNKNOWN_MARK'],

@@ -6,6 +6,7 @@ import {
   type GroupInfo,
   type GroupMembership,
   type PagePermissions,
+  type PageRestrictionHit,
   type PrivacyGateway,
   type UserInfo,
 } from '../ports/confluence';
@@ -178,6 +179,57 @@ export class ForgeConfluenceGateway implements ConfluenceGateway {
     if (!res.ok) fail(res);
     const j = await readJson(res);
     return Array.isArray(j.results) && j.results.length > 0;
+  }
+
+  async pageSummary(
+    pageId: string,
+  ): Promise<{ status: 'OK' | 'MISSING' | 'UNKNOWN'; title: string | null }> {
+    if (!PAGE_ID_RE.test(pageId)) return { status: 'UNKNOWN', title: null };
+    const res = await api.asUser().requestConfluence(route`/wiki/api/v2/pages/${pageId}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.status === 404) return { status: 'MISSING', title: null };
+    if (res.status === 403) return { status: 'UNKNOWN', title: null };
+    if (!res.ok) fail(res);
+    const j = await readJson(res);
+    return { status: 'OK', title: typeof j.title === 'string' ? j.title : null };
+  }
+
+  async pageRestrictions(pageId: string): Promise<PageRestrictionHit[]> {
+    if (!PAGE_ID_RE.test(pageId)) return [];
+    const res = await api
+      .asUser()
+      .requestConfluence(route`/wiki/rest/api/content/${pageId}/restriction/byOperation`, {
+        headers: { Accept: 'application/json' },
+      });
+    if (res.status === 404) return [];
+    if (!res.ok) fail(res);
+    const j = await readJson(res);
+    const out: PageRestrictionHit[] = [];
+    for (const operation of ['read', 'update'] as const) {
+      const block = j[operation];
+      if (!isObj(block) || !isObj(block.restrictions)) continue;
+      const restrictions = block.restrictions;
+      const users =
+        isObj(restrictions.user) && Array.isArray(restrictions.user.results)
+          ? restrictions.user.results
+          : [];
+      const groups =
+        isObj(restrictions.group) && Array.isArray(restrictions.group.results)
+          ? restrictions.group.results
+          : [];
+      for (const u of users) {
+        if (isObj(u) && typeof u.accountId === 'string') {
+          out.push({ principalType: 'USER', principalId: u.accountId, operation });
+        }
+      }
+      for (const g of groups) {
+        if (isObj(g) && typeof g.id === 'string') {
+          out.push({ principalType: 'GROUP', principalId: g.id, operation });
+        }
+      }
+    }
+    return out;
   }
 
   async isSiteAdmin(accountId: string): Promise<boolean> {

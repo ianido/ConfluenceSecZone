@@ -42,6 +42,31 @@ describe('resolver surface: every function denies unauthorised callers and leaks
     recoverSection: { newAdministratorAccountId: 'mallory', confirm: true },
     bindHere: { sectionRef: 'x' },
     copyHere: { sourceRef: 'x' },
+    updateMetadata: { title: 'hijack', classification: 'RESTRICTED' },
+    getAccessInfo: {},
+    requestAccess: { role: 'VIEW', reason: 'please' },
+    cancelAccessRequest: {},
+    listAccessRequests: {},
+    resolveAccessRequest: {
+      accountId: 'mallory',
+      decision: 'APPROVE',
+      expectedAclVersion: 1,
+    },
+    copyGrants: {
+      sourceRef: '00000000-0000-4000-8000-000000000099',
+      expectedAclVersion: 1,
+    },
+    seedPageRestrictions: { expectedAclVersion: 1 },
+    dismissNotice: {},
+    setRevisionTag: { version: 1, tag: 'approved' },
+    revealSecret: { label: 'Password' },
+    deleteOrphan: { sectionId: '00000000-0000-4000-8000-000000000099', confirm: 'DELETE' },
+    updateSitePolicy: { policy: {}, retention: {} },
+    recoverUnowned: {
+      sectionId: '00000000-0000-4000-8000-000000000099',
+      newAdministratorAccountId: 'mallory',
+      confirm: 'RECOVER',
+    },
   };
 
   for (const fn of RESOLVER_FUNCTIONS.filter((f) => f !== 'createSection')) {
@@ -52,6 +77,17 @@ describe('resolver surface: every function denies unauthorised callers and leaks
       if (fn === 'getEffectiveAccess') {
         // Reporting "no role" for the caller's own identity reveals nothing beyond the denied card.
         expect(res).toMatchObject({ ok: true, data: { role: null, sources: [] } });
+      } else if (
+        fn === 'getAccessInfo' ||
+        fn === 'requestAccess' ||
+        fn === 'cancelAccessRequest' ||
+        fn === 'listMySections' ||
+        fn === 'exportMyAudit' ||
+        fn === 'listPageSections'
+      ) {
+        // Public metadata and the caller's own request. Title/classification are not secret.
+        expect(res).toMatchObject({ ok: true });
+        expect(JSON.stringify(res)).not.toMatch(/GRANT_|CONTENT_|bodyJson/);
       } else if (fn !== 'getSection') expect(res).toMatchObject({ ok: false });
       else expect(res).toEqual({ state: 'DENIED' });
     });

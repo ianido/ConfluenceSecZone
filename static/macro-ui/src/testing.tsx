@@ -37,6 +37,15 @@ export function readyView(
     canWrite: true,
     canEditPage: true,
     aclVersion: 1,
+    meta: { title: null, classification: null, sharedWith: { users: 1, groups: 0 } },
+    notice: null,
+    protection: {
+      watermark: false,
+      autoLockMinutes: null,
+      protectCopy: false,
+      viewerName: 'Alice',
+      lockByDefault: true,
+    },
     content: {
       doc: {
         type: 'doc',

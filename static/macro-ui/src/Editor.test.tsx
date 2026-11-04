@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { t as translate, type ContentPayload } from '@secure-sections/shared';
 import { EditPanel } from './Editor';
@@ -32,6 +32,52 @@ describe('EditPanel', () => {
     expect(call?.payload).toMatchObject({ baseVersion: 1 });
     expect(JSON.stringify(call?.payload)).toContain('horizontalRule');
     expect(Object.keys(call?.payload as object).sort()).toEqual(['baseVersion', 'doc']);
+  });
+
+  it('sends an optional change note with the save', async () => {
+    const saved = vi.fn();
+    const api = scriptedApi({
+      saveContent: (p) => ({
+        ok: true,
+        data: {
+          content: { ...initial, doc: (p as { doc: ContentPayload['doc'] }).doc, version: 2 },
+        },
+      }),
+    });
+    renderWithI18n(<EditPanel api={api} initial={initial} onSaved={saved} onCancel={() => {}} />);
+    await userEvent.click(await screen.findByRole('button', { name: hrLabel }));
+    fireEvent.change(screen.getByRole('textbox', { name: /What changed/ }), {
+      target: { value: 'raise Technology' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(api.calls.find((c) => c.fn === 'saveContent')?.payload).toMatchObject({
+      changeNote: 'raise Technology',
+    });
+  });
+
+  it('shows a word count and saves with Ctrl+S only when there are changes', async () => {
+    const saved = vi.fn();
+    const api = scriptedApi({
+      saveContent: (p) => ({
+        ok: true,
+        data: {
+          content: { ...initial, doc: (p as { doc: ContentPayload['doc'] }).doc, version: 2 },
+        },
+      }),
+    });
+    renderWithI18n(<EditPanel api={api} initial={initial} onSaved={saved} onCancel={() => {}} />);
+    await screen.findByRole('button', { name: 'Save' });
+    expect(await screen.findByText('2 words')).toBeTruthy();
+
+    screen.getByRole('textbox', { name: 'Protected content editor' }).focus();
+    await userEvent.keyboard('{Control>}s{/Control}');
+    expect(api.calls.filter((c) => c.fn === 'saveContent')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: hrLabel }));
+    await userEvent.keyboard('{Control>}s{/Control}');
+    await waitFor(() => expect(saved).toHaveBeenCalled());
+    expect(api.calls.filter((c) => c.fn === 'saveContent')).toHaveLength(1);
   });
 
   it('conflict: shows latest-version choices instead of silently overwriting', async () => {

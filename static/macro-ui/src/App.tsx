@@ -7,16 +7,30 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  CLASSIFICATIONS,
+  SECTION_TEMPLATES,
+  TITLE_MAX_LENGTH,
   docIsEmpty,
+  isClassification,
   roleAtLeast,
+  type AccessInfo,
+  type Classification,
   type ContentPayload,
+  type Role,
+  type SectionMeta,
+  type SectionTemplate,
+  type ProtectionFlags,
+  type RichDoc,
   type SectionView,
 } from '@secure-sections/shared';
 import { ApiError, safeCall, unwrap, type Api } from './api';
+import { AccessRequestBox } from './Access';
 import { EditPanel } from './Editor';
+import { SectionHeader } from './Header';
 import { useT } from './i18n';
 import { AuditPanel, HelpPanel, HistoryPanel, PermissionsPanel } from './Panels';
 import { RichRenderer } from './Renderer';
+import { LockIcon, TemplateMark } from './visual';
 
 type Tab = 'content' | 'permissions' | 'history' | 'audit' | 'help';
 
@@ -40,8 +54,7 @@ function StateCard({
       aria-live={role === 'alert' ? 'assertive' : 'polite'}
     >
       <h2>
-        <span aria-hidden="true">🔒 </span>
-        {title}
+        <LockIcon /> {title}
       </h2>
       <p>{body}</p>
       {children}
@@ -85,15 +98,7 @@ export function App({ api }: { api: Api }) {
   }
   switch (view.state) {
     case 'DENIED':
-      return (
-        <StateCard title={t('state.denied.title')} body={t('state.denied.body')}>
-          <details>
-            <summary>{t('nav.help')}</summary>
-            <p>{t('perm.requestAccess')}</p>
-            <HelpPanel api={api} userRole={null} />
-          </details>
-        </StateCard>
-      );
+      return <Denied api={api} />;
     case 'UNAVAILABLE':
       return (
         <StateCard
@@ -123,6 +128,30 @@ export function App({ api }: { api: Api }) {
   }
 }
 
+function Denied({ api }: { api: Api }) {
+  const t = useT();
+  const [info, setInfo] = useState<AccessInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    void safeCall(api, 'getAccessInfo', {}).then((res) => {
+      if (live && res.ok) setInfo(res.data);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api]);
+  return (
+    <StateCard title={t('state.denied.title')} body={t('state.denied.body')}>
+      {info && <AccessRequestBox api={api} info={info} onInfo={setInfo} />}
+      <details>
+        <summary>{t('nav.help')}</summary>
+        <p>{t('perm.requestAccess')}</p>
+        <HelpPanel api={api} userRole={null} />
+      </details>
+    </StateCard>
+  );
+}
+
 function Unconfigured({
   api,
   canCreate,
@@ -136,7 +165,37 @@ function Unconfigured({
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<'none' | 'bind' | 'copy'>('none');
   const [ref, setRef] = useState('');
+  const [title, setTitle] = useState('');
+  const [classification, setClassification] = useState<Classification | ''>('');
+  const [template, setTemplate] = useState<SectionTemplate>('blank');
+  const [shareQuery, setShareQuery] = useState('');
+  const [shareId, setShareId] = useState('');
+  const [shareLabel, setShareLabel] = useState('');
+  const [shareRole, setShareRole] = useState<Role>('VIEW');
+  const [shareHits, setShareHits] = useState<Array<{ id: string; label: string }>>([]);
+  const [shareKind, setShareKind] = useState<'USER' | 'GROUP'>('USER');
+  const [pickedKind, setPickedKind] = useState<'USER' | 'GROUP'>('USER');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = shareQuery.trim();
+    if (q.length < 2) {
+      setShareHits([]);
+      return undefined;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void safeCall(api, 'searchPrincipals', { query: q, type: shareKind }).then((res) => {
+        if (live && res.ok) {
+          setShareHits(res.data.hits.map((h) => ({ id: h.principalId, label: h.label })));
+        }
+      });
+    }, 250);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [api, shareKind, shareQuery]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -163,19 +222,157 @@ function Unconfigured({
         <p>{t('state.unconfigured.cannotCreate')}</p>
       ) : (
         <>
-          <h3>{t('wizard.title')}</h3>
+          <h3 className="ss-wizard-title">
+            <LockIcon /> {t('wizard.title')}
+          </h3>
           <ol>
             <li>{t('wizard.step1')}</li>
             <li>{t('wizard.step2')}</li>
             <li>{t('wizard.step3')}</li>
           </ol>
           <p className="ss-muted">{t('wizard.copyWarning')}</p>
+          <div className="ss-meta-form">
+            <label>
+              {t('meta.title.label')}
+              <input
+                value={title}
+                maxLength={TITLE_MAX_LENGTH}
+                placeholder={t('meta.title.placeholder')}
+                onChange={(e) => setTitle(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              {t('meta.class.label')}
+              <select
+                value={classification}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setClassification(isClassification(v) ? v : '');
+                }}
+              >
+                <option value="">{t('meta.class.none')}</option>
+                {CLASSIFICATIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {t(`class.${c}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="ss-muted ss-meta-note">{t('meta.public.note')}</p>
+            <div role="radiogroup" aria-label={t('wizard.template')} className="ss-templates">
+              {SECTION_TEMPLATES.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={template === id}
+                  className="ss-template"
+                  onClick={() => setTemplate(id)}
+                >
+                  <TemplateMark id={id} />
+                  <strong>{t(`wizard.template.${id}`)}</strong>
+                  <span className="ss-template-hint">{t(`wizard.template.${id}.hint`)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="ss-share-row">
+              <label>
+                {t('wizard.share')}
+                <input
+                  value={shareQuery}
+                  placeholder={
+                    shareKind === 'GROUP' ? t('perm.search.groups') : t('perm.search.users')
+                  }
+                  onChange={(e) => setShareQuery(e.target.value)}
+                />
+              </label>
+              <label>
+                <select
+                  aria-label={t('wizard.share.kind')}
+                  value={shareKind}
+                  onChange={(e) => {
+                    const next = e.target.value === 'GROUP' ? 'GROUP' : 'USER';
+                    setShareKind(next);
+                    setShareHits([]);
+                  }}
+                >
+                  <option value="USER">{t('perm.user')}</option>
+                  <option value="GROUP">{t('perm.group')}</option>
+                </select>
+              </label>
+              <label>
+                <span className="ss-sr">{t('nav.permissions')}</span>
+                <select
+                  aria-label={t('nav.permissions')}
+                  value={shareRole}
+                  onChange={(e) => setShareRole(e.target.value as Role)}
+                >
+                  <option value="VIEW">{t('role.VIEW')}</option>
+                  <option value="MODIFY">{t('role.MODIFY')}</option>
+                </select>
+              </label>
+            </div>
+            <ul>
+              {shareHits.map((h) => (
+                <li key={h.id}>
+                  <button
+                    type="button"
+                    className="ss-btn"
+                    onClick={() => {
+                      setShareId(h.id);
+                      setShareLabel(h.label);
+                      setPickedKind(shareKind);
+                    }}
+                  >
+                    {h.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {shareId && (
+              <p>
+                {t('wizard.share.with', { name: shareLabel })}{' '}
+                <button
+                  type="button"
+                  className="ss-btn"
+                  onClick={() => {
+                    setShareId('');
+                    setShareLabel('');
+                  }}
+                >
+                  {t('wizard.share.clear')}
+                </button>
+              </p>
+            )}
+          </div>
           <div className="ss-actions">
             <button
               type="button"
               className="ss-btn ss-primary"
               disabled={busy}
-              onClick={() => run(async () => unwrap(await api.call('createSection', {})))}
+              onClick={() =>
+                run(async () =>
+                  unwrap(
+                    await api.call('createSection', {
+                      title: title.trim() === '' ? null : title.trim(),
+                      classification: classification === '' ? null : classification,
+                      template,
+                      ...(shareId
+                        ? {
+                            initialGrants: [
+                              {
+                                principalType: pickedKind,
+                                principalId: shareId,
+                                role: shareRole,
+                              },
+                            ],
+                          }
+                        : {}),
+                    }),
+                  ),
+                )
+              }
             >
               {t('action.create')}
             </button>
@@ -228,6 +425,95 @@ function Unconfigured({
   );
 }
 
+function ProtectedReading({
+  api,
+  doc,
+  protection,
+  locked,
+  lockReason,
+  onLock,
+  onUnlock,
+}: {
+  api: Api;
+  doc: RichDoc;
+  protection: ProtectionFlags;
+  locked: boolean;
+  lockReason: 'initial' | 'idle';
+  onLock: (reason: 'idle') => void;
+  onUnlock: () => void;
+}) {
+  const t = useT();
+  const [leftMs, setLeftMs] = useState<number | null>(
+    protection.autoLockMinutes ? protection.autoLockMinutes * 60_000 : null,
+  );
+  useEffect(() => {
+    if (!protection.autoLockMinutes || locked) return undefined;
+    const ms = protection.autoLockMinutes * 60_000;
+    let idleFrom = Date.now();
+    setLeftMs(ms);
+    let lockTimer = window.setTimeout(() => onLock('idle'), ms);
+    const tick = window.setInterval(() => {
+      setLeftMs(Math.max(0, ms - (Date.now() - idleFrom)));
+    }, 1000);
+    const bump = () => {
+      idleFrom = Date.now();
+      window.clearTimeout(lockTimer);
+      lockTimer = window.setTimeout(() => onLock('idle'), ms);
+    };
+    window.addEventListener('pointerdown', bump);
+    window.addEventListener('keydown', bump);
+    return () => {
+      window.clearTimeout(lockTimer);
+      window.clearInterval(tick);
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+    };
+  }, [locked, onLock, protection.autoLockMinutes]);
+  if (locked) {
+    return (
+      <section className="ss-card ss-lock-card" role="status">
+        <LockIcon large />
+        <h2>{lockReason === 'idle' ? t('protect.locked') : t('protect.locked.initial')}</h2>
+        <button type="button" className="ss-btn ss-primary" onClick={onUnlock}>
+          {t('protect.unlock')}
+        </button>
+      </section>
+    );
+  }
+  const stamp = t('protect.watermark', {
+    name: protection.viewerName,
+    date: new Date().toLocaleDateString(),
+  });
+  const totalSec = leftMs === null ? 0 : Math.max(0, Math.ceil(leftMs / 1000));
+  const remain = `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
+  return (
+    <div className={protection.protectCopy ? 'ss-reading ss-protect' : 'ss-reading'}>
+      <div className="ss-protect-bar">
+        {protection.autoLockMinutes !== null && leftMs !== null && (
+          <span className="ss-muted">{t('protect.countdown', { time: remain })}</span>
+        )}
+        <button type="button" className="ss-btn" onClick={() => onLock('idle')}>
+          <LockIcon /> {t('protect.lockNow')}
+        </button>
+      </div>
+      {protection.watermark && (
+        <div className="ss-watermark" aria-hidden="true">
+          {Array.from({ length: 6 }, (_, i) => (
+            <span key={i}>{`${stamp}    ${stamp}    ${stamp}`}</span>
+          ))}
+        </div>
+      )}
+      <RichRenderer
+        doc={doc}
+        onRevealSecret={(label) => {
+          void api.call('revealSecret', { label });
+        }}
+      />
+      {protection.protectCopy && <p className="ss-muted">{t('protect.note')}</p>}
+    </div>
+  );
+}
+
 function Ready({
   api,
   view,
@@ -240,7 +526,27 @@ function Ready({
   const t = useT();
   const [tab, setTab] = useState<Tab>('content');
   const [content, setContent] = useState<ContentPayload>(view.content);
+  const [meta, setMeta] = useState<SectionMeta>(view.meta);
   const [editing, setEditing] = useState(false);
+  const [pending, setPending] = useState(0);
+  const isAdmin = roleAtLeast(view.role, 'ADMINISTER');
+  const [locked, setLocked] = useState(
+    () => view.protection.lockByDefault && !docIsEmpty(content.doc),
+  );
+  const [lockReason, setLockReason] = useState<'initial' | 'idle'>('initial');
+  const lockIdle = useCallback(() => {
+    setLockReason('idle');
+    setLocked(true);
+  }, []);
+  const seenVersion = useRef(content.version);
+  useEffect(() => {
+    if (seenVersion.current === content.version) return;
+    seenVersion.current = content.version;
+    if (view.protection.lockByDefault && !docIsEmpty(content.doc)) {
+      setLocked(true);
+      setLockReason('initial');
+    }
+  }, [content.doc, content.version, view.protection.lockByDefault]);
   const tabs: Tab[] = ['content'];
   if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('permissions');
   if (roleAtLeast(view.role, 'MODIFY')) tabs.push('history');
@@ -248,6 +554,17 @@ function Ready({
   tabs.push('help');
 
   useEffect(() => setContent(view.content), [view.content]);
+  useEffect(() => setMeta(view.meta), [view.meta]);
+  useEffect(() => {
+    if (!isAdmin) return undefined;
+    let live = true;
+    void safeCall(api, 'listAccessRequests', {}).then((res) => {
+      if (live && res.ok) setPending(res.data.requests.length);
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, isAdmin]);
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, idx: number) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -258,6 +575,33 @@ function Ready({
 
   return (
     <div className="ss-shell">
+      {view.notice && (
+        <div className="ss-callout" role="status">
+          <p>
+            {t('notice.added', {
+              name: view.notice.addedByName,
+              role: t(`role.${view.notice.role}`),
+            })}
+          </p>
+          <button
+            type="button"
+            className="ss-btn"
+            onClick={() => {
+              void safeCall(api, 'dismissNotice', {}).then(() => reload());
+            }}
+          >
+            {t('notice.dismiss')}
+          </button>
+        </div>
+      )}
+      <SectionHeader
+        api={api}
+        meta={meta}
+        canAdminister={roleAtLeast(view.role, 'ADMINISTER')}
+        editingLocked={editing}
+        onMeta={setMeta}
+        onManage={() => setTab('permissions')}
+      />
       <div role="tablist" aria-label={t('app.title')} className="ss-tabs">
         {tabs.map((id, i) => (
           <button
@@ -274,6 +618,15 @@ function Ready({
             onKeyDown={(e) => onKey(e, i)}
           >
             {t(`nav.${id === 'audit' ? 'audit' : id}`)}
+            {id === 'permissions' && pending > 0 && (
+              <span
+                className="ss-count"
+                role="img"
+                aria-label={`${pending} ${t('requests.badge')}`}
+              >
+                {pending}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -297,10 +650,25 @@ function Ready({
                   <strong>{t('state.empty.title')}</strong> {t('state.empty.body')}
                 </p>
               ) : (
-                <RichRenderer doc={content.doc} />
+                <ProtectedReading
+                  api={api}
+                  doc={content.doc}
+                  protection={view.protection}
+                  locked={locked}
+                  lockReason={lockReason}
+                  onLock={lockIdle}
+                  onUnlock={() => setLocked(false)}
+                />
               )}
+              <p className="ss-muted ss-saved">
+                {t('content.savedBy', {
+                  name: content.updatedBy?.displayName ?? '—',
+                  when: new Date(content.updatedAt).toLocaleString(),
+                  version: content.version,
+                })}
+              </p>
               <div className="ss-actions">
-                {view.canWrite && (
+                {view.canWrite && !locked && (
                   <button
                     type="button"
                     className="ss-btn ss-primary"
@@ -318,7 +686,7 @@ function Ready({
               </div>
             </section>
           ))}
-        {tab === 'permissions' && <PermissionsPanel api={api} />}
+        {tab === 'permissions' && <PermissionsPanel api={api} onPending={setPending} />}
         {tab === 'history' && (
           <HistoryPanel
             api={api}

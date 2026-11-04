@@ -38,6 +38,34 @@ describe('content versions', () => {
     ]);
   });
 
+  it('stores an optional change note on the revision and never puts it in the audit payload', async () => {
+    const w = await world();
+    await w.service.saveContent(alice, doc('one'), 1, 'raise Technology');
+    const hist = await w.service.listRevisions(alice, null);
+    expect(hist.revisions.find((r) => r.version === 2)?.changeNote).toBe('raise Technology');
+    const audit = await w.service.listAudit(alice, null);
+    expect(JSON.stringify(audit)).not.toContain('raise Technology');
+    await expect(
+      w.service.saveContent(alice, doc('two'), 2, 'x'.repeat(141)),
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+  });
+
+  it('labels a revision without copying the label into the audit entry', async () => {
+    const w = await world();
+    await w.service.saveContent(alice, doc('one'), 1);
+    const tagged = await w.service.setRevisionTag(alice, 2, ' approved ');
+    expect(tagged.tag).toBe('approved');
+    const hist = await w.service.listRevisions(alice, null);
+    expect(hist.revisions.find((r) => r.version === 2)?.tag).toBe('approved');
+    const audit = await w.service.listAudit(alice, null);
+    expect(audit.entries.some((e) => e.action === 'REVISION_TAG')).toBe(true);
+    expect(JSON.stringify(audit)).not.toContain('approved');
+    const cleared = await w.service.setRevisionTag(alice, 2, '');
+    expect(cleared.tag).toBeNull();
+  });
+
   it('detects concurrent edits (optimistic concurrency) and never silently overwrites', async () => {
     const w = await world();
     const [a, b] = await Promise.allSettled([

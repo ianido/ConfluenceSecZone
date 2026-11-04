@@ -1,17 +1,103 @@
-import type { ReactNode } from 'react';
-import { isSafeHref, type BlockNode, type InlineNode, type RichDoc } from '@secure-sections/shared';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  isDataImage,
+  isSafeHref,
+  type BlockNode,
+  type InlineNode,
+  type RichDoc,
+} from '@secure-sections/shared';
+import { useT } from './i18n';
+import { CopyIcon, EyeIcon } from './visual';
 
 /**
  * Renders validated RichDoc JSON to React elements. There is no HTML parsing and no
  * dangerouslySetInnerHTML anywhere: text is always rendered as text nodes, and link hrefs are
  * re-checked here even though the server already validated them (defence in depth).
  */
-export function RichRenderer({ doc }: { doc: RichDoc }) {
-  return <div className="ss-prose">{doc.content.map((b, i) => block(b, i))}</div>;
+export function RichRenderer({
+  doc,
+  onRevealSecret,
+}: {
+  doc: RichDoc;
+  /** Called when a reader reveals a secret. Must not receive the secret value. */
+  onRevealSecret?: (label: string) => void;
+}) {
+  return <div className="ss-prose">{doc.content.map((b, i) => block(b, i, onRevealSecret))}</div>;
 }
 
-function inline(n: InlineNode, key: number): ReactNode {
+function SecretChip({
+  label,
+  value,
+  onReveal,
+}: {
+  label: string;
+  value: string;
+  onReveal?: (label: string) => void;
+}) {
+  const t = useT();
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!shown) return undefined;
+    const timer = window.setTimeout(() => setShown(false), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [shown]);
+  return (
+    <span className="ss-secret">
+      <span className="ss-chip">{label}</span>{' '}
+      {shown ? (
+        <span className="ss-secret-value">{value}</span>
+      ) : (
+        <>
+          <span className="ss-secret-mask" />
+          <span className="ss-sr">{t('secret.hidden')}</span>
+        </>
+      )}{' '}
+      <button
+        type="button"
+        className="ss-btn ss-small"
+        onClick={() => {
+          setShown(true);
+          onReveal?.(label);
+        }}
+      >
+        <EyeIcon /> {t('secret.reveal')}
+      </button>
+      <button
+        type="button"
+        className="ss-btn ss-small"
+        onClick={() => {
+          void navigator.clipboard?.writeText(value).then(() => {
+            setCopied(true);
+            onReveal?.(label);
+          });
+        }}
+      >
+        <CopyIcon /> {copied ? t('secret.copied') : t('secret.copy')}
+      </button>
+    </span>
+  );
+}
+
+function inline(n: InlineNode, key: number, onReveal?: (label: string) => void): ReactNode {
   if (n.type === 'hardBreak') return <br key={key} />;
+  if (n.type === 'mention') {
+    return (
+      <span key={key} className="ss-mention" title={n.attrs.accountId}>
+        @{n.attrs.label}
+      </span>
+    );
+  }
+  if (n.type === 'secret') {
+    return (
+      <SecretChip
+        key={key}
+        label={n.attrs.label}
+        value={n.attrs.value}
+        {...(onReveal ? { onReveal } : {})}
+      />
+    );
+  }
   let el: ReactNode = n.text;
   for (const m of n.marks ?? []) {
     switch (m.type) {
@@ -41,16 +127,16 @@ function inline(n: InlineNode, key: number): ReactNode {
   return <span key={key}>{el}</span>;
 }
 
-function children(nodes: BlockNode[]): ReactNode[] {
-  return nodes.map((c, i) => block(c, i));
+function children(nodes: BlockNode[], onReveal?: (label: string) => void): ReactNode[] {
+  return nodes.map((c, i) => block(c, i, onReveal));
 }
 
-function block(n: BlockNode, key: number): ReactNode {
+function block(n: BlockNode, key: number, onReveal?: (label: string) => void): ReactNode {
   switch (n.type) {
     case 'paragraph':
-      return <p key={key}>{(n.content ?? []).map((c, i) => inline(c, i))}</p>;
+      return <p key={key}>{(n.content ?? []).map((c, i) => inline(c, i, onReveal))}</p>;
     case 'heading': {
-      const content = (n.content ?? []).map((c, i) => inline(c, i));
+      const content = (n.content ?? []).map((c, i) => inline(c, i, onReveal));
       switch (n.attrs.level) {
         case 1:
           return <h2 key={key}>{content}</h2>;
@@ -61,13 +147,13 @@ function block(n: BlockNode, key: number): ReactNode {
       }
     }
     case 'bulletList':
-      return <ul key={key}>{children(n.content)}</ul>;
+      return <ul key={key}>{children(n.content, onReveal)}</ul>;
     case 'orderedList':
-      return <ol key={key}>{children(n.content)}</ol>;
+      return <ol key={key}>{children(n.content, onReveal)}</ol>;
     case 'listItem':
-      return <li key={key}>{children(n.content)}</li>;
+      return <li key={key}>{children(n.content, onReveal)}</li>;
     case 'blockquote':
-      return <blockquote key={key}>{children(n.content)}</blockquote>;
+      return <blockquote key={key}>{children(n.content, onReveal)}</blockquote>;
     case 'codeBlock':
       return (
         <pre key={key}>
@@ -80,23 +166,33 @@ function block(n: BlockNode, key: number): ReactNode {
       return (
         <div className="ss-table-wrap" key={key}>
           <table>
-            <tbody>{children(n.content)}</tbody>
+            <tbody>{children(n.content, onReveal)}</tbody>
           </table>
         </div>
       );
     case 'tableRow':
-      return <tr key={key}>{children(n.content)}</tr>;
+      return <tr key={key}>{children(n.content, onReveal)}</tr>;
     case 'tableHeader':
       return (
         <th key={key} colSpan={n.attrs?.colspan ?? 1} rowSpan={n.attrs?.rowspan ?? 1}>
-          {children(n.content)}
+          {children(n.content, onReveal)}
         </th>
       );
     case 'tableCell':
       return (
         <td key={key} colSpan={n.attrs?.colspan ?? 1} rowSpan={n.attrs?.rowspan ?? 1}>
-          {children(n.content)}
+          {children(n.content, onReveal)}
         </td>
       );
+    case 'callout':
+      return (
+        <aside key={key} className={`ss-callout ss-${n.attrs.tone}`} data-tone={n.attrs.tone}>
+          {children(n.content, onReveal)}
+        </aside>
+      );
+    case 'image':
+      return isDataImage(n.attrs.src) ? (
+        <img key={key} src={n.attrs.src} alt={n.attrs.alt} />
+      ) : null;
   }
 }
