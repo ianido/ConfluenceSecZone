@@ -296,7 +296,12 @@ export function EditPanel({ api, initial, onSaved, onCancel }: Props) {
           <p>{t('editor.conflict.body')}</p>
           <details open>
             <summary>{t('editor.conflict.loadLatest')}</summary>
-            <RichRenderer doc={conflict.doc} />
+            <RichRenderer
+              doc={conflict.doc}
+              onRevealSecret={(label) => {
+                void api.call('revealSecret', { label });
+              }}
+            />
           </details>
           <button
             type="button"

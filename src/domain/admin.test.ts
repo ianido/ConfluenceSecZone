@@ -105,4 +105,28 @@ describe('site administration', () => {
     const after = await w.service.getAdminOverview(site('alice'));
     expect(after.noAdmin).toHaveLength(0);
   });
+
+  it('recovers a section after every administrator grant has expired', async () => {
+    const w = await world();
+    const alice = ctxFor('alice');
+    await w.service.createSection(alice, 'Plan', 'INTERNAL');
+    const soon = new Date(w.clock.now().getTime() + 86_400_000).toISOString();
+    const acl = (await w.service.listGrants(alice)).aclVersion;
+    await w.service.upsertGrant(alice, {
+      principalType: 'USER',
+      principalId: 'alice',
+      role: 'ADMINISTER',
+      expectedAclVersion: acl,
+      expiresAt: soon,
+    });
+    w.clock.advanceDays(2);
+    const overview = await w.service.getAdminOverview(site('alice'));
+    expect(overview.noAdmin).toHaveLength(1);
+    const id = overview.noAdmin[0]!.sectionId;
+    await w.service.recoverUnowned(site('alice'), id, 'bob', 'RECOVER');
+    const bob = (await w.service.listGrants(ctxFor('bob'))).grants.find(
+      (g) => g.principalId === 'bob',
+    );
+    expect(bob).toMatchObject({ role: 'ADMINISTER', expiresAt: null });
+  });
 });

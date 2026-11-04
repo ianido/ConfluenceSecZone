@@ -37,3 +37,12 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 - Added the missing `report:personal-data` scope and a 7-day personal-data reporting floor.
 - A secret field value lives in the stored document. Anyone with View, and anyone who can read app storage, can read it. The reveal audit stores the label, never the value.
 - Watermark, auto-lock and copy/print hiding are deterrence. They are not a boundary: View still returns the document.
+
+### Fixed
+
+- Unlock asks the server again and stays closed when access is gone. Saving a classification reloads the protection flags.
+- A new administrator keeps the expiry chosen in the form. Renewal uses the site cap when that cap is under 30 days.
+- History comparison stops allocating a full line matrix once the document is large.
+- Privacy reporting includes notice recipients and mention account ids, and erasure rewrites those mentions.
+- An expired administrator grant no longer blocks recovery. Deleting an orphan asks for the typed word DELETE.
+- Revealing a secret in history or in the editor conflict preview is audited.

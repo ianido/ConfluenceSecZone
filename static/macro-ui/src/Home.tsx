@@ -14,6 +14,7 @@ export function Home({ api }: { api: Api }) {
   const [klass, setKlass] = useState<Classification | ''>('');
   const [orphansOnly, setOrphansOnly] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmText, setConfirmText] = useState('');
 
   const load = () => {
     setError(null);
@@ -158,7 +159,10 @@ export function Home({ api }: { api: Api }) {
                   <button
                     type="button"
                     className="ss-btn ss-danger"
-                    onClick={() => setConfirmId(r.sectionId)}
+                    onClick={() => {
+                      setConfirmText('');
+                      setConfirmId(r.sectionId);
+                    }}
                   >
                     {t('action.remove')}
                   </button>
@@ -172,17 +176,29 @@ export function Home({ api }: { api: Api }) {
       {confirmId && (
         <div role="alertdialog" aria-label={t('home.delete')} className="ss-callout ss-warn">
           <p>{t('home.delete')}</p>
+          <label>
+            {t('home.delete.confirm')}
+            <input
+              value={confirmText}
+              aria-label={t('home.delete.confirm')}
+              onChange={(e) => setConfirmText(e.target.value)}
+            />
+          </label>
           <button
             type="button"
             className="ss-btn ss-danger"
+            disabled={confirmText !== 'DELETE'}
             onClick={() => {
-              void safeCall(api, 'deleteOrphan', { sectionId: confirmId, confirm: 'DELETE' }).then(
-                (res) => {
-                  setConfirmId(null);
-                  if (res.ok) load();
-                  else setError(t('error.generic'));
-                },
-              );
+              if (confirmText !== 'DELETE') return;
+              void safeCall(api, 'deleteOrphan', {
+                sectionId: confirmId,
+                confirm: confirmText,
+              }).then((res) => {
+                setConfirmId(null);
+                setConfirmText('');
+                if (res.ok) load();
+                else setError(t('error.generic'));
+              });
             }}
           >
             {t('action.confirm')}

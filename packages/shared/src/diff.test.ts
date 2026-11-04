@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffDocs, docToLines } from './diff.js';
+import { DIFF_CELL_BUDGET, diffDocs, diffLines, docToLines } from './diff.js';
 import type { RichDoc } from './editor-schema.js';
 
 const doc = (text: string): RichDoc => ({
@@ -44,6 +44,15 @@ describe('document diff', () => {
       { kind: 'equal', text: 'alpha' },
       { kind: 'del', text: 'beta' },
     ]);
+  });
+
+  it('does not allocate a full matrix once the line counts exceed the budget', () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `line ${i}`);
+    expect(lines.length * (lines.length + 1)).toBeGreaterThan(DIFF_CELL_BUDGET);
+    const next = [...lines, 'tail'];
+    const diff = diffLines(lines, next);
+    expect(diff.filter((d) => d.kind === 'equal')).toHaveLength(lines.length);
+    expect(diff.filter((d) => d.kind === 'add').map((d) => d.text)).toEqual(['tail']);
   });
 
   it('treats two empty documents as equal', () => {

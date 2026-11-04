@@ -539,6 +539,19 @@ function Ready({
     setLocked(true);
   }, []);
   const seenVersion = useRef(content.version);
+  const unlock = () => {
+    void (async () => {
+      const res = await safeCall(api, 'getSection', {});
+      if (!('state' in res) || res.state !== 'READY') {
+        reload();
+        return;
+      }
+      seenVersion.current = res.content.version;
+      setContent(res.content);
+      setMeta(res.meta);
+      setLocked(false);
+    })();
+  };
   useEffect(() => {
     if (seenVersion.current === content.version) return;
     seenVersion.current = content.version;
@@ -599,7 +612,10 @@ function Ready({
         meta={meta}
         canAdminister={roleAtLeast(view.role, 'ADMINISTER')}
         editingLocked={editing}
-        onMeta={setMeta}
+        onMeta={(next) => {
+          setMeta(next);
+          reload();
+        }}
         onManage={() => setTab('permissions')}
       />
       <div role="tablist" aria-label={t('app.title')} className="ss-tabs">
@@ -657,7 +673,7 @@ function Ready({
                   locked={locked}
                   lockReason={lockReason}
                   onLock={lockIdle}
-                  onUnlock={() => setLocked(false)}
+                  onUnlock={unlock}
                 />
               )}
               <p className="ss-muted ss-saved">

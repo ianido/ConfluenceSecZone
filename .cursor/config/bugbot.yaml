@@ -1,0 +1,18 @@
+# Bugbot reads this file from the pull request base branch.
+# autofix.mode can only lower a dashboard setting; it cannot turn Autofix on by itself.
+version: 1
+
+triggers:
+  drafts: false
+  frequency: everyPush
+
+review:
+  effort: default
+  incremental: true
+
+prSummary:
+  mode: comment
+  riskScore: true
+
+autofix:
+  mode: existingBranch

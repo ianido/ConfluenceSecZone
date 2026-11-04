@@ -1,6 +1,6 @@
 import type { Clock, Logger } from '../ports/runtime';
 import type { PrivacyGateway } from '../ports/confluence';
-import { StoreConflictError, type Store, type TxOp } from '../ports/store';
+import { StoreConflictError, type ListResult, type Store, type TxOp } from '../ports/store';
 import { sha256 } from './audit';
 import {
   Idx,
@@ -52,6 +52,10 @@ export class PrivacyService {
       ids.add(g.addedBy);
     }
     for (const r of s.requests ?? []) ids.add(r.accountId);
+    for (const n of s.notices ?? []) {
+      ids.add(n.accountId);
+      ids.add(n.addedBy);
+    }
     const audits = await this.store.list<AuditDoc>({
       entity: 'audit',
       partition: s.sectionId,
@@ -59,13 +63,22 @@ export class PrivacyService {
       limit: 100,
     });
     for (const a of audits.items) ids.add(a.value.actor);
-    const revs = await this.store.list<RevisionDoc>({
-      entity: 'revision',
-      partition: s.sectionId,
-      order: 'DESC',
-      limit: 100,
-    });
-    for (const r of revs.items) ids.add(r.value.authorAccountId);
+    let revCursor: string | null = null;
+    for (;;) {
+      const revs: ListResult<RevisionDoc> = await this.store.list<RevisionDoc>({
+        entity: 'revision',
+        partition: s.sectionId,
+        order: 'DESC',
+        limit: 100,
+        cursor: revCursor,
+      });
+      for (const r of revs.items) {
+        ids.add(r.value.authorAccountId);
+        for (const id of mentionAccountIds(r.value.bodyJson)) ids.add(id);
+      }
+      if (!revs.nextCursor) break;
+      revCursor = revs.nextCursor;
+    }
     ids.delete(ERASED);
     return ids;
   }
@@ -260,16 +273,27 @@ export class PrivacyService {
       limit: 24,
     });
     for (;;) {
-      const updates: TxOp[] = rpage.items
-        .filter((r) => r.value.authorAccountId === accountId)
-        .map((r) => ({
+      const updates: TxOp[] = [];
+      for (const r of rpage.items) {
+        const bodyJson = anonymiseMentions(r.value.bodyJson, accountId, pseudonym);
+        const authorHit = r.value.authorAccountId === accountId;
+        if (!authorHit && bodyJson === null) continue;
+        const nextBody = bodyJson ?? r.value.bodyJson;
+        updates.push({
           kind: 'put',
           entity: 'revision',
           key: r.key,
-          value: { ...r.value, authorAccountId: pseudonym },
+          value: {
+            ...r.value,
+            authorAccountId: authorHit ? pseudonym : r.value.authorAccountId,
+            bodyJson: nextBody,
+            sha256: sha256(nextBody),
+            bytes: Buffer.byteLength(nextBody, 'utf8'),
+          },
           index: Idx.revision(sid, r.value.version),
           expectRev: r.rev,
-        }));
+        });
+      }
       if (updates.length) await this.store.transact(updates);
       if (!rpage.nextCursor) break;
       rpage = await this.store.list<RevisionDoc>({
@@ -281,4 +305,53 @@ export class PrivacyService {
       });
     }
   }
+}
+
+function mentionAccountIds(bodyJson: string): string[] {
+  const ids: string[] = [];
+  walkDoc(bodyJson, (node) => {
+    if (node.type === 'mention' && typeof node.attrs?.accountId === 'string') {
+      ids.push(node.attrs.accountId);
+    }
+  });
+  return ids;
+}
+
+/** Returns the rewritten document, or null when no mention of this account is present. */
+function anonymiseMentions(bodyJson: string, accountId: string, pseudonym: string): string | null {
+  let changed = false;
+  const next = walkDoc(bodyJson, (node) => {
+    if (node.type !== 'mention' || node.attrs?.accountId !== accountId) return;
+    node.attrs.accountId = pseudonym;
+    node.attrs.label = pseudonym;
+    changed = true;
+  });
+  return changed && next !== null ? JSON.stringify(next) : null;
+}
+
+function walkDoc(bodyJson: string, visit: (node: DocNode) => void): unknown {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyJson);
+  } catch {
+    return null;
+  }
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const record = node as DocNode;
+    visit(record);
+    if (Array.isArray(record.content)) record.content.forEach(walk);
+  };
+  walk(parsed);
+  return parsed;
+}
+
+interface DocNode {
+  type?: string;
+  attrs?: { accountId?: string; label?: string };
+  content?: unknown[];
 }

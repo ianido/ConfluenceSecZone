@@ -119,7 +119,11 @@ export function PermissionsPanel({
   const [hits, setHits] = useState<PrincipalHit[]>([]);
   const [role, setRole] = useState<Role>('VIEW');
   const [ttl, setTtl] = useState<'never' | '7' | '30' | '90'>('never');
-  const [pendingAdmin, setPendingAdmin] = useState<PrincipalHit | null>(null);
+  const [pendingAdmin, setPendingAdmin] = useState<{
+    hit: PrincipalHit;
+    /** Omitted when a role change should keep the grant's current expiry. */
+    expiresAt?: string | null;
+  } | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<{ type: PrincipalType; id: string } | null>(
     null,
   );
@@ -243,7 +247,7 @@ export function PermissionsPanel({
                       principalId: g.principalId,
                       label: g.label,
                     };
-                    if (next === 'ADMINISTER') setPendingAdmin(hit);
+                    if (next === 'ADMINISTER') setPendingAdmin({ hit });
                     else void upsert(hit, next);
                   }}
                 >
@@ -279,7 +283,8 @@ export function PermissionsPanel({
                   <button
                     type="button"
                     className="ss-btn"
-                    onClick={() =>
+                    onClick={() => {
+                      const days = Math.min(30, list.maxGrantDays);
                       void upsert(
                         {
                           principalType: g.principalType,
@@ -287,9 +292,9 @@ export function PermissionsPanel({
                           label: g.label,
                         },
                         g.role,
-                        expiresAtFor('30'),
-                      )
-                    }
+                        new Date(Date.now() + days * 86_400_000).toISOString(),
+                      );
+                    }}
                   >
                     {t('perm.renew')}
                   </button>
@@ -338,12 +343,12 @@ export function PermissionsPanel({
       {pendingAdmin && (
         <div role="alertdialog" aria-label={t('perm.confirm.admin')} className="ss-callout ss-warn">
           <p>
-            <strong>{pendingAdmin.label}</strong>: {t('perm.confirm.admin')}
+            <strong>{pendingAdmin.hit.label}</strong>: {t('perm.confirm.admin')}
           </p>
           <button
             type="button"
             className="ss-btn ss-danger"
-            onClick={() => void upsert(pendingAdmin, 'ADMINISTER')}
+            onClick={() => void upsert(pendingAdmin.hit, 'ADMINISTER', pendingAdmin.expiresAt)}
           >
             {t('action.confirm')}
           </button>
@@ -442,7 +447,7 @@ export function PermissionsPanel({
                 className="ss-btn"
                 onClick={() =>
                   role === 'ADMINISTER'
-                    ? setPendingAdmin(h)
+                    ? setPendingAdmin({ hit: h, expiresAt: expiresAtFor(ttl) })
                     : void upsert(h, role, expiresAtFor(ttl))
                 }
               >
@@ -559,6 +564,9 @@ export function HistoryPanel({
   onRestored: () => void;
 }) {
   const t = useT();
+  const revealSecret = (label: string) => {
+    void api.call('revealSecret', { label });
+  };
   const hist = useLoad<RevisionList>(async () => unwrap(await api.call('listRevisions', {})));
   const [preview, setPreview] = useState<{ version: number; doc: RichDoc } | null>(null);
   const [compare, setCompare] = useState<{
@@ -751,7 +759,7 @@ export function HistoryPanel({
       {preview && (
         <div className="ss-preview" aria-label={`v${preview.version}`}>
           <h3>v{preview.version}</h3>
-          <RichRenderer doc={preview.doc} />
+          <RichRenderer doc={preview.doc} onRevealSecret={revealSecret} />
           <button type="button" className="ss-btn" onClick={() => setPreview(null)}>
             {t('action.close')}
           </button>
@@ -766,11 +774,11 @@ export function HistoryPanel({
           <div className="ss-side">
             <div>
               <h4>v{compare.from}</h4>
-              <RichRenderer doc={compare.left} />
+              <RichRenderer doc={compare.left} onRevealSecret={revealSecret} />
             </div>
             <div>
               <h4>v{compare.to}</h4>
-              <RichRenderer doc={compare.right} />
+              <RichRenderer doc={compare.right} onRevealSecret={revealSecret} />
             </div>
           </div>
           {compare.lines.every((l) => l.kind === 'equal') ? (

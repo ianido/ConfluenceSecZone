@@ -26,6 +26,17 @@ describe('App states', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('keeps the document hidden when access is gone at unlock', async () => {
+    let n = 0;
+    const api = scriptedApi({
+      getSection: () => (n++ === 0 ? readyView() : { state: 'DENIED' }),
+    });
+    renderWithI18n(<App api={api} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Unlock' }));
+    expect(await screen.findByText('Your access was removed')).toBeTruthy();
+    expect(screen.queryByText('Quarterly numbers')).toBeNull();
+  });
+
   it('denied: shows no content and offers actionable guidance', async () => {
     const api = scriptedApi({
       getSection: () => ({ state: 'DENIED' }),
@@ -232,12 +243,32 @@ describe('Section header', () => {
   });
 
   it('only administrators can edit details; saving sends only title and classification', async () => {
+    let saved = false;
     const api = scriptedApi({
-      getSection: () => readyView(),
-      updateMetadata: (p) => ({
-        ok: true,
-        data: { ...(p as object), sharedWith: { users: 1, groups: 0 } },
-      }),
+      getSection: () =>
+        saved
+          ? readyView({
+              meta: {
+                title: 'Board notes',
+                classification: 'RESTRICTED',
+                sharedWith: { users: 1, groups: 0 },
+              },
+              protection: {
+                watermark: true,
+                autoLockMinutes: 5,
+                protectCopy: true,
+                viewerName: 'Alice',
+                lockByDefault: true,
+              },
+            })
+          : readyView(),
+      updateMetadata: (p) => {
+        saved = true;
+        return {
+          ok: true,
+          data: { ...(p as object), sharedWith: { users: 1, groups: 0 } },
+        };
+      },
     });
     renderWithI18n(<App api={api} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit details' }));
@@ -249,6 +280,8 @@ describe('Section header', () => {
     expect(screen.getByText('Restricted')).toBeTruthy();
     const call = api.calls.find((c) => c.fn === 'updateMetadata');
     expect(call?.payload).toEqual({ title: 'Board notes', classification: 'RESTRICTED' });
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
+    expect((await screen.findAllByText(/Visible to Alice/)).length).toBeGreaterThan(0);
   });
 
   it('non-administrators get no edit or manage controls', async () => {
@@ -305,6 +338,7 @@ describe('Permissions panel', () => {
     data: {
       aclVersion: 3,
       ownerAccountId: 'alice',
+      maxGrantDays: 365,
       grants: [
         {
           principalType: 'USER',

@@ -74,10 +74,17 @@ function flatten(n: BlockNode): string {
   return docToLines(tmp).join(' ') || lines.join(' ');
 }
 
-/** Myers-style shortest edit script on two string arrays (O(n·m) is fine: docs are bounded). */
+/** Above this many LCS cells, skip the matrix and use a linear prefix/suffix edit. */
+export const DIFF_CELL_BUDGET = 20_000;
+
+/**
+ * Shortest edit script for two line arrays. The full matrix is only built when it stays
+ * inside DIFF_CELL_BUDGET, so a large but valid document cannot allocate millions of cells.
+ */
 export function diffLines(a: string[], b: string[]): DiffLine[] {
   const n = a.length;
   const m = b.length;
+  if (n * m > DIFF_CELL_BUDGET) return boundedLineDiff(a, b);
   const dp: number[][] = Array.from({ length: n + 1 }, () => Array<number>(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i -= 1) {
     for (let j = m - 1; j >= 0; j -= 1) {
@@ -111,6 +118,24 @@ export function diffLines(a: string[], b: string[]): DiffLine[] {
     out.push({ kind: 'add', text: b[j]! });
     j += 1;
   }
+  return out;
+}
+
+/** Common prefix and suffix stay, and the middle is a delete plus an insert. O(n + m) space. */
+function boundedLineDiff(a: string[], b: string[]): DiffLine[] {
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start += 1;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+    endA -= 1;
+    endB -= 1;
+  }
+  const out: DiffLine[] = [];
+  for (let i = 0; i < start; i += 1) out.push({ kind: 'equal', text: a[i]! });
+  for (let i = start; i < endA; i += 1) out.push({ kind: 'del', text: a[i]! });
+  for (let j = start; j < endB; j += 1) out.push({ kind: 'add', text: b[j]! });
+  for (let i = endA; i < a.length; i += 1) out.push({ kind: 'equal', text: a[i]! });
   return out;
 }
 

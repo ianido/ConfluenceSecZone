@@ -199,6 +199,8 @@ export interface GrantList {
   grants: Grant[];
   aclVersion: number;
   ownerAccountId: string;
+  /** Longest grant the policy allows for someone who is not a site administrator. */
+  maxGrantDays: number;
 }
 
 export interface PrincipalHit {

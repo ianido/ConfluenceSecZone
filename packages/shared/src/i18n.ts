@@ -23,6 +23,7 @@ const en = {
   'home.activity': 'Recent activity',
   'home.activity.note': 'Activity lists who did what. It never includes section content.',
   'home.delete': 'Delete this section? Its page no longer exists. Confirming removes it.',
+  'home.delete.confirm': 'Type DELETE to confirm',
   'admin.settings': 'Secure Sections settings',
   'admin.denied': 'Only a Confluence site administrator can open these settings.',
   'admin.diagnostics': 'Diagnostics',
@@ -381,6 +382,7 @@ const es: Record<MessageKey, string> = {
   'home.activity.note':
     'La actividad dice quién hizo qué. Nunca incluye el contenido de la sección.',
   'home.delete': '¿Eliminar esta sección? Su página ya no existe. Confirmar la quita.',
+  'home.delete.confirm': 'Escribe DELETE para confirmar',
   'admin.settings': 'Ajustes de Secciones seguras',
   'admin.denied': 'Solo un administrador del sitio de Confluence puede abrir estos ajustes.',
   'admin.diagnostics': 'Diagnóstico',

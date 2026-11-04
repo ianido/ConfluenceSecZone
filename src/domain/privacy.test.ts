@@ -75,6 +75,49 @@ describe('privacy: closed accounts', () => {
     await w.privacy.sweep();
     expect(snapshot()).toBe(before);
   });
+
+  it('reports a mentioned account and a notice recipient, then anonymises both', async () => {
+    const w = makeWorld();
+    w.gateway.addUser('alice', 'Alice');
+    w.gateway.addUser('carol', 'Carol');
+    w.gateway.setPage('1001', 'alice', { canView: true, canEdit: true });
+    w.gateway.setPage('1001', 'carol', { canView: true, canEdit: true });
+    await w.service.createSection(alice, 'Notes', 'INTERNAL');
+    await w.service.saveContent(
+      alice,
+      {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'mention', attrs: { accountId: 'dave', label: 'Dave' } }],
+          },
+        ],
+      },
+      1,
+    );
+    await w.service.upsertGrant(alice, {
+      principalType: 'USER',
+      principalId: 'carol',
+      role: 'VIEW',
+      expectedAclVersion: 1,
+    });
+    const acl = (await w.service.listGrants(alice)).aclVersion;
+    await w.service.revokeGrant(alice, {
+      principalType: 'USER',
+      principalId: 'carol',
+      expectedAclVersion: acl,
+    });
+    w.privacyGateway.closed.add('dave');
+    w.privacyGateway.closed.add('carol');
+    await w.privacy.sweep();
+    const dump = JSON.stringify(w.store.dump());
+    expect(dump).not.toContain('"dave"');
+    expect(dump).not.toContain('"Dave"');
+    expect(dump).not.toContain('"carol"');
+    const hist = await w.service.listRevisions(alice, null);
+    expect(hist.revisions.length).toBeGreaterThan(0);
+  });
 });
 
 describe('privacy: reporting cycle', () => {

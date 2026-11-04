@@ -868,7 +868,13 @@ export class SecureSectionService {
         active: gr ? gr.exists : true,
       };
     });
-    return { grants, aclVersion: section.aclVersion, ownerAccountId: section.ownerAccountId };
+    const policy = await this.readSitePolicy();
+    return {
+      grants,
+      aclVersion: section.aclVersion,
+      ownerAccountId: section.ownerAccountId,
+      maxGrantDays: policy.maxGrantDays,
+    };
   }
 
   async listGrants(ctx: TrustedContext): Promise<GrantList> {
@@ -1759,21 +1765,7 @@ export class SecureSectionService {
       const s = sec.value;
       if (await this.hasActiveAdministrator(s)) throw new DomainError('NOT_RECOVERABLE');
       const now = this.nowIso();
-      const existing = s.grants.find(
-        (g) => g.principalType === 'USER' && g.principalId === target.id,
-      );
-      const grants = existing
-        ? s.grants.map((g) => (g === existing ? { ...g, role: 'ADMINISTER' as const } : g))
-        : [
-            ...s.grants,
-            {
-              principalType: 'USER' as const,
-              principalId: target.id,
-              role: 'ADMINISTER' as const,
-              addedAt: now,
-              addedBy: ctx.accountId,
-            },
-          ];
+      const grants = this.grantsWithAdministrator(s, target.id, ctx.accountId, now);
       const next: SectionDoc = {
         ...s,
         status: 'ACTIVE',
@@ -1793,8 +1785,39 @@ export class SecureSectionService {
     });
   }
 
+  /**
+   * Promotes the target to administrator. An existing grant loses its expiry so a
+   * recovered person is not immediately expired again.
+   */
+  private grantsWithAdministrator(
+    s: SectionDoc,
+    targetId: string,
+    actor: string,
+    now: string,
+  ): SectionDoc['grants'] {
+    const existing = s.grants.find((g) => g.principalType === 'USER' && g.principalId === targetId);
+    if (!existing) {
+      return [
+        ...s.grants,
+        {
+          principalType: 'USER',
+          principalId: targetId,
+          role: 'ADMINISTER',
+          addedAt: now,
+          addedBy: actor,
+        },
+      ];
+    }
+    return s.grants.map((g) =>
+      g === existing ? { ...g, role: 'ADMINISTER' as const, expiresAt: null } : g,
+    );
+  }
+
   private async hasActiveAdministrator(s: SectionDoc): Promise<boolean> {
-    const admins = s.grants.filter((g) => g.role === 'ADMINISTER');
+    const now = this.clock.now().getTime();
+    const admins = s.grants.filter(
+      (g) => g.role === 'ADMINISTER' && (!g.expiresAt || Date.parse(g.expiresAt) > now),
+    );
     const users = admins.filter((g) => g.principalType === 'USER').map((g) => g.principalId);
     const groups = admins.filter((g) => g.principalType === 'GROUP').map((g) => g.principalId);
     try {
@@ -2089,21 +2112,7 @@ export class SecureSectionService {
       const s = sec.value;
       if (await this.hasActiveAdministrator(s)) throw new DomainError('NOT_RECOVERABLE');
       const now = this.nowIso();
-      const existing = s.grants.find(
-        (g) => g.principalType === 'USER' && g.principalId === target.id,
-      );
-      const grants = existing
-        ? s.grants.map((g) => (g === existing ? { ...g, role: 'ADMINISTER' as const } : g))
-        : [
-            ...s.grants,
-            {
-              principalType: 'USER' as const,
-              principalId: target.id,
-              role: 'ADMINISTER' as const,
-              addedAt: now,
-              addedBy: ctx.accountId,
-            },
-          ];
+      const grants = this.grantsWithAdministrator(s, target.id, ctx.accountId, now);
       const next: SectionDoc = {
         ...s,
         grants,
