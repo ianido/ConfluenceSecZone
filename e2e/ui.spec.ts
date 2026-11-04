@@ -194,7 +194,7 @@ test('home page column shows the title and the full id on hover', async ({ page,
     'href',
     'https://example.atlassian.net/wiki/pages/viewpage.action?pageId=1001',
   );
-  await expect(clip).toHaveAttribute('target', '_blank');
+  await expect(clip).not.toHaveAttribute('target');
   const narrow = await clip.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
   expect(narrow.scroll).toBeGreaterThan(narrow.client);
   await clip.hover();

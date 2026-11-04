@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { MySections } from '@secure-sections/shared';
 import { Home } from './Home';
 import { renderWithI18n, scriptedApi } from './testing';
@@ -29,17 +30,26 @@ const data: MySections = {
 describe('My secure sections page column', () => {
   it('shows the page title, and the id plus the full title on hover', async () => {
     const api = scriptedApi({ listMySections: () => ({ ok: true, data }) });
-    renderWithI18n(<Home api={api} siteUrl="https://example.atlassian.net/wiki" />);
-    const tip = `[2134310913] : ${longTitle}`;
-    const label = await screen.findByRole('link', { name: longTitle });
-    expect(label.getAttribute('href')).toBe(
-      'https://example.atlassian.net/wiki/pages/viewpage.action?pageId=2134310913',
+    const opened: Array<{ pageId: string; href: string }> = [];
+    renderWithI18n(
+      <Home
+        api={api}
+        siteUrl="https://example.atlassian.net/wiki"
+        openPage={(pageId, href) => {
+          opened.push({ pageId, href });
+        }}
+      />,
     );
-    expect(label.getAttribute('target')).toBe('_blank');
-    expect(label.getAttribute('rel')).toContain('noopener');
+    const tip = `[2134310913] : ${longTitle}`;
+    const href = 'https://example.atlassian.net/wiki/pages/viewpage.action?pageId=2134310913';
+    const label = await screen.findByRole('link', { name: longTitle });
+    expect(label.getAttribute('href')).toBe(href);
+    expect(label.getAttribute('target')).toBeNull();
     expect(label.getAttribute('title')).toBe(tip);
     expect(label.textContent).not.toContain('2134310913');
     expect(screen.getByRole('tooltip').textContent).toBe(tip);
+    await userEvent.click(label);
+    expect(opened).toEqual([{ pageId: '2134310913', href }]);
   });
 
   it('does not link a page that no longer exists', async () => {

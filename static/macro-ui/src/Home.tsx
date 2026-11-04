@@ -6,7 +6,15 @@ import { ClassificationBadge } from './Header';
 import { useT } from './i18n';
 import { CountFaces, LockIcon, Pill } from './visual';
 
-export function Home({ api, siteUrl = null }: { api: Api; siteUrl?: string | null }) {
+export function Home({
+  api,
+  siteUrl = null,
+  openPage = openConfluencePage,
+}: {
+  api: Api;
+  siteUrl?: string | null;
+  openPage?: (pageId: string, href: string) => void | Promise<void>;
+}) {
   const t = useT();
   const [data, setData] = useState<MySections | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +141,7 @@ export function Home({ api, siteUrl = null }: { api: Api; siteUrl?: string | nul
                   pageId={r.pageId}
                   pageTitle={r.pageTitle}
                   href={r.pageStatus === 'MISSING' ? null : pageHref(siteUrl, r.pageId)}
+                  openPage={openPage}
                 />
               </td>
               <td>{r.spaceKey ?? '—'}</td>
@@ -216,6 +225,19 @@ function pageTip(pageId: string, pageTitle: string | null): string {
   return pageTitle ? `[${pageId}] : ${pageTitle}` : `[${pageId}]`;
 }
 
+/**
+ * Same-window navigation. A plain anchor cannot leave the Forge iframe, and a new tab is blocked
+ * there, so the click asks Confluence to open the page in the current tab.
+ */
+export async function openConfluencePage(pageId: string, href: string): Promise<void> {
+  try {
+    const { router } = await import('@forge/bridge');
+    await router.navigate({ target: 'contentView', contentId: pageId });
+  } catch {
+    window.location.assign(href);
+  }
+}
+
 /** Absolute Confluence URL. The macro iframe cannot use a relative /wiki path. */
 function pageHref(siteUrl: string | null, pageId: string): string | null {
   if (!siteUrl || !/^\d{1,20}$/.test(pageId)) return null;
@@ -233,17 +255,37 @@ function PageLabel({
   pageId,
   pageTitle,
   href,
+  openPage,
 }: {
   pageId: string;
   pageTitle: string | null;
   href: string | null;
+  openPage: (pageId: string, href: string) => void | Promise<void>;
 }) {
   const tip = pageTip(pageId, pageTitle);
   const text = pageTitle ?? pageId;
   return (
     <>
       {href ? (
-        <a className="ss-clip" href={href} target="_blank" rel="noopener noreferrer" title={tip}>
+        <a
+          className="ss-clip"
+          href={href}
+          title={tip}
+          onClick={(event) => {
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            ) {
+              return;
+            }
+            event.preventDefault();
+            void openPage(pageId, href);
+          }}
+        >
           {text}
         </a>
       ) : (
