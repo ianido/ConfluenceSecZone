@@ -499,6 +499,26 @@ describe('History panel', () => {
 });
 
 describe('Protected reading', () => {
+  it('shows the content immediately when the site leaves sections unlocked', async () => {
+    const api = scriptedApi({
+      getSection: () =>
+        readyView({
+          protection: {
+            watermark: false,
+            autoLockMinutes: null,
+            protectCopy: false,
+            viewerName: 'Alice',
+            lockByDefault: false,
+          },
+        }),
+    });
+    renderWithI18n(<App api={api} />);
+    expect(await screen.findByText('Quarterly numbers')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Unlock' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Lock now' }));
+    expect(await screen.findByRole('heading', { name: /locked after a period/ })).toBeTruthy();
+  });
+
   it('shows a deterrence watermark and records a reveal without sending the secret', async () => {
     const api = scriptedApi({
       getSection: () =>
@@ -508,6 +528,7 @@ describe('Protected reading', () => {
             autoLockMinutes: null,
             protectCopy: true,
             viewerName: 'Alice',
+            lockByDefault: true,
           },
           content: {
             doc: {

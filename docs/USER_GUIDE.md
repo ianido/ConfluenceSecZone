@@ -55,7 +55,7 @@ History can label a version (40 characters). The label is not copied into Activi
 
 ## Reading a restricted section
 
-Every section opens locked, including for an administrator. Choose **Unlock** to read it. A Restricted section can then show your name and the date as a watermark, a countdown until it locks again, and **Lock now**. Internal and Confidential sections show the countdown only when a site administrator turns auto-lock on. The section can also discourage selecting or printing. This makes casual copying harder. It does not stop someone who can view the section from reading the stored text. Unlocking loads the section again.
+A site administrator chooses this under **Settings → Secure Sections → Policies → Open sections locked**. The switch starts on, so a section that already has content opens locked for every reader, including an administrator. Choose **Unlock** to read it. Turn the switch off and the content is visible as soon as the section opens. An empty section stays open either way, so the author can edit. **Lock now** and the inactivity timer still lock the section afterwards. A Restricted section can then show your name and the date as a watermark and a countdown until it locks again. Internal and Confidential sections show the countdown only when a site administrator turns auto-lock on. The section can also discourage selecting or printing. This makes casual copying harder. It does not stop someone who can view the section from reading the stored text. Unlocking loads the section again.
 
 ## My secure sections
 

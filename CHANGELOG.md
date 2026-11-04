@@ -19,7 +19,7 @@ All notable changes. Format based on Keep a Changelog. Versions are internal unt
 - Site settings: request and grant policy, per-classification deterrence, retention numbers, diagnostics, and recovery of a section that has no active administrator.
 - Creation templates (blank, credentials, HR, minutes) as cards, an optional person or group to share with at creation, and a page byline that lists title, classification and your role. The byline never shows content. Directory search before the section exists is limited to someone who is allowed to create it.
 - Reader **Lock now** and a countdown while auto-lock is enabled. The image description is asked only when inserting an image. The editor hints at `/` and `@`.
-- A section with content opens locked for every reader, including an administrator. Unlock reveals it.
+- Site policy **Open sections locked** (on by default). A section with content opens locked for every reader, including an administrator. Turn it off and the content is visible immediately. Lock now and inactivity auto-lock still apply. A policy saved before this switch stays on.
 - Site settings use the mockup layout: side navigation, policy toggles, retention, classification badges, diagnostics and recovery.
 - Mockup chrome on every screen: lock and gear icons, colored classification and status pills, initials avatars, template marks, a repeating watermark, and green/red lines in the history diff.
 - My sections no longer fails when the storage query asks for more than 100 rows. Forge rejects that page size, and the screen was showing the generic error.

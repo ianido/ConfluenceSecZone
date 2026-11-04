@@ -530,7 +530,9 @@ function Ready({
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(0);
   const isAdmin = roleAtLeast(view.role, 'ADMINISTER');
-  const [locked, setLocked] = useState(() => !docIsEmpty(content.doc));
+  const [locked, setLocked] = useState(
+    () => view.protection.lockByDefault && !docIsEmpty(content.doc),
+  );
   const [lockReason, setLockReason] = useState<'initial' | 'idle'>('initial');
   const lockIdle = useCallback(() => {
     setLockReason('idle');
@@ -540,11 +542,11 @@ function Ready({
   useEffect(() => {
     if (seenVersion.current === content.version) return;
     seenVersion.current = content.version;
-    if (!docIsEmpty(content.doc)) {
+    if (view.protection.lockByDefault && !docIsEmpty(content.doc)) {
       setLocked(true);
       setLockReason('initial');
     }
-  }, [content.doc, content.version]);
+  }, [content.doc, content.version, view.protection.lockByDefault]);
   const tabs: Tab[] = ['content'];
   if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('permissions');
   if (roleAtLeast(view.role, 'MODIFY')) tabs.push('history');

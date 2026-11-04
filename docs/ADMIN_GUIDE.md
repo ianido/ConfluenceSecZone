@@ -62,6 +62,7 @@ administrator does not automatically see the content; whoever they nominate cont
 Confluence **Settings → Secure Sections** (site administrators only):
 
 - Who may create a section (page editors, or site administrators only), whether access requests are allowed, whether a change note is required, and the longest grant a guest may receive (up to 365 days). A grant whose **target** is a site administrator may use the full 365 days. A site administrator granting a guest is still capped.
+- **Open sections locked** (on by default, on the Policies page). A section that already has content opens locked for every reader, including administrators. Turning it off shows the content immediately. Lock now and inactivity auto-lock still work. An empty section stays open so the author can edit. A policy record saved before this switch is treated as on.
 - Per classification: watermark, minutes before auto-lock, and protect copy. Restricted starts with watermark, 5 minutes and protect copy. The others start off. These settings make casual copying harder. They do not hide the document from someone who already has View.
 - Retention numbers. Saving writes the same retention record the daily job already reads.
 - Diagnostics: section count, whether any section has no active administrator (with recovery), orphan pages, and the time of the last finished retention pass. Recovery asks for the word RECOVER, adds one administrator, and does not return content.

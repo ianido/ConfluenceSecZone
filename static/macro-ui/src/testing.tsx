@@ -44,6 +44,7 @@ export function readyView(
       autoLockMinutes: null,
       protectCopy: false,
       viewerName: 'Alice',
+      lockByDefault: true,
     },
     content: {
       doc: {

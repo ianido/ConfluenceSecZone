@@ -369,6 +369,7 @@ export class SecureSectionService {
           ? days
           : DEFAULT_SITE_POLICY.maxGrantDays,
       requireChangeNote: raw.requireChangeNote === true,
+      lockByDefault: raw.lockByDefault !== false,
       whoMayCreate: raw.whoMayCreate === 'SITE_ADMINS' ? 'SITE_ADMINS' : 'PAGE_EDITORS',
       classes,
     };
@@ -385,6 +386,7 @@ export class SecureSectionService {
       autoLockMinutes: row?.autoLockMinutes ?? null,
       protectCopy: row?.protectCopy ?? false,
       viewerName: viewer?.displayName ?? accountId,
+      lockByDefault: policy.lockByDefault,
     };
   }
 
@@ -2217,13 +2219,18 @@ function parseSitePolicy(raw: unknown): SitePolicy {
       autoLockMinutes: minutes,
     };
   });
-  if (typeof o.allowRequests !== 'boolean' || typeof o.requireChangeNote !== 'boolean') {
+  if (
+    typeof o.allowRequests !== 'boolean' ||
+    typeof o.requireChangeNote !== 'boolean' ||
+    typeof o.lockByDefault !== 'boolean'
+  ) {
     throw new DomainError('INVALID_REQUEST');
   }
   return {
     allowRequests: o.allowRequests,
     maxGrantDays: days,
     requireChangeNote: o.requireChangeNote,
+    lockByDefault: o.lockByDefault,
     whoMayCreate: o.whoMayCreate,
     classes,
   };

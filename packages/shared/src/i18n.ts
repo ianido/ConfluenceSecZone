@@ -65,6 +65,9 @@ const en = {
     'Applies to people who are not site administrators. Groups use the same cap.',
   'admin.days': '{n} days',
   'admin.minutes': '{n} minutes',
+  'admin.lockByDefault': 'Open sections locked',
+  'admin.lockByDefault.help':
+    'A section that already has content opens locked for everyone, including administrators. Unlock to read.',
   'admin.autolock.site': 'Inactivity auto-lock',
   'admin.autolock.help':
     'Restricted sections use this time. Adjust the others under Classifications.',
@@ -420,6 +423,9 @@ const es: Record<MessageKey, string> = {
     'Aplica a quien no es administrador del sitio. Los grupos usan el mismo tope.',
   'admin.days': '{n} días',
   'admin.minutes': '{n} minutos',
+  'admin.lockByDefault': 'Abrir las secciones bloqueadas',
+  'admin.lockByDefault.help':
+    'Una sección que ya tiene contenido se abre bloqueada para todos, incluidos los administradores. Hay que desbloquear para leer.',
   'admin.autolock.site': 'Auto-bloqueo por inactividad',
   'admin.autolock.help':
     'La clasificación Restringido usa este tiempo. Las demás se ajustan en Clasificaciones.',

@@ -287,6 +287,8 @@ export interface SitePolicy {
   allowRequests: boolean;
   maxGrantDays: number;
   requireChangeNote: boolean;
+  /** When true, a section that already has content opens locked for every role. */
+  lockByDefault: boolean;
   whoMayCreate: WhoMayCreate;
   classes: ClassPolicy[];
 }
@@ -352,6 +354,8 @@ export interface ProtectionFlags {
   autoLockMinutes: number | null;
   protectCopy: boolean;
   viewerName: string;
+  /** Copied from the site policy so the macro can lock without a second request. */
+  lockByDefault: boolean;
 }
 
 export interface RetentionConfig {

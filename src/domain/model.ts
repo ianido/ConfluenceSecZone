@@ -31,6 +31,7 @@ export const DEFAULT_SITE_POLICY: SitePolicy = {
   allowRequests: true,
   maxGrantDays: MAX_GRANT_TTL_DAYS,
   requireChangeNote: false,
+  lockByDefault: true,
   whoMayCreate: 'PAGE_EDITORS',
   classes: [
     { id: 'INTERNAL', watermark: false, autoLockMinutes: null, protectCopy: false },

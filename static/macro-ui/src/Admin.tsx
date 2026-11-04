@@ -170,6 +170,17 @@ export function Admin({ api }: { api: Api }) {
                 }
               />
               <Setting
+                title={t('admin.lockByDefault')}
+                help={t('admin.lockByDefault.help')}
+                control={
+                  <Switch
+                    label={t('admin.lockByDefault')}
+                    checked={data.policy.lockByDefault}
+                    onChange={(checked) => setPolicy({ lockByDefault: checked })}
+                  />
+                }
+              />
+              <Setting
                 title={t('admin.autolock.site')}
                 help={t('admin.autolock.help')}
                 control={

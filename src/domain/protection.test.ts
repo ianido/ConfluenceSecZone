@@ -32,6 +32,7 @@ describe('reader protection flags', () => {
         autoLockMinutes: 5,
         protectCopy: true,
         viewerName: 'Alice',
+        lockByDefault: true,
       },
     });
     await w.service.updateMetadata(alice, { title: 'Plan', classification: 'INTERNAL' });
