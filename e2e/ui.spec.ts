@@ -33,6 +33,15 @@ async function axe(page: Page) {
   expect(violations).toEqual([]);
 }
 
+async function grantPerson(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Add access' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add access' });
+  await dialog.getByRole('searchbox').fill(name);
+  await dialog.getByRole('button', { name: 'Search people' }).click();
+  await dialog.getByRole('checkbox', { name }).check();
+  await dialog.getByRole('button', { name: /Add selected/ }).click();
+}
+
 test.beforeEach(async ({ request }) => {
   await request.get('/__reset');
 });
@@ -65,12 +74,15 @@ test('author creates, edits and shares a section; unauthorised editor sees nothi
   await axe(bob);
 
   await page.getByRole('tab', { name: 'Permissions' }).click();
-  await page.getByRole('searchbox').fill('Bob');
-  await page.getByRole('button', { name: 'Search people' }).click();
-  await page
-    .locator('.ss-hits li', { hasText: 'Bob' })
-    .getByRole('button', { name: 'Add' })
-    .click();
+  await page.getByRole('button', { name: 'Add access' }).click();
+  const addDialog = page.getByRole('dialog', { name: 'Add access' });
+  await addDialog.getByRole('searchbox').fill('Bob');
+  await addDialog.getByRole('button', { name: 'Search people' }).click();
+  await expect(addDialog.getByRole('checkbox', { name: 'Bob' })).toBeVisible();
+  await addDialog.getByRole('checkbox', { name: 'Bob' }).check();
+  await page.screenshot({ path: '/opt/cursor/artifacts/add-access-dialog.png', fullPage: true });
+  await axe(page);
+  await addDialog.getByRole('button', { name: /Add selected/ }).click();
   await expect(page.getByText('Permissions updated.')).toBeVisible();
   await page.screenshot({ path: 'docs/screenshots/04-permissions.png' });
   await axe(page);
@@ -126,12 +138,7 @@ test('removed access is reflected on reload and the stale view shows no content'
   await page.keyboard.type(SECRET);
   await page.getByRole('button', { name: 'Save' }).click();
   await page.getByRole('tab', { name: 'Permissions' }).click();
-  await page.getByRole('searchbox').fill('Bob');
-  await page.getByRole('button', { name: 'Search people' }).click();
-  await page
-    .locator('.ss-hits li', { hasText: 'Bob' })
-    .getByRole('button', { name: 'Add' })
-    .click();
+  await grantPerson(page, 'Bob');
   await expect(page.getByText('Permissions updated.')).toBeVisible();
 
   const bob = await (await browser.newContext()).newPage();
