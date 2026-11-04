@@ -6,7 +6,7 @@ import { ClassificationBadge } from './Header';
 import { useT } from './i18n';
 import { CountFaces, LockIcon, Pill } from './visual';
 
-export function Home({ api }: { api: Api }) {
+export function Home({ api, siteUrl = null }: { api: Api; siteUrl?: string | null }) {
   const t = useT();
   const [data, setData] = useState<MySections | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -129,12 +129,11 @@ export function Home({ api }: { api: Api }) {
                 <strong>{r.title ?? t('home.untitled')}</strong>
               </td>
               <td className="ss-page-cell">
-                <span className="ss-clip" title={pageTip(r.pageId, r.pageTitle)}>
-                  {r.pageTitle ?? r.pageId}
-                </span>
-                <span className="ss-tip" role="tooltip">
-                  {pageTip(r.pageId, r.pageTitle)}
-                </span>
+                <PageLabel
+                  pageId={r.pageId}
+                  pageTitle={r.pageTitle}
+                  href={r.pageStatus === 'MISSING' ? null : pageHref(siteUrl, r.pageId)}
+                />
               </td>
               <td>{r.spaceKey ?? '—'}</td>
               <td>{r.classification ? <ClassificationBadge value={r.classification} /> : '—'}</td>
@@ -215,6 +214,48 @@ export function Home({ api }: { api: Api }) {
 
 function pageTip(pageId: string, pageTitle: string | null): string {
   return pageTitle ? `[${pageId}] : ${pageTitle}` : `[${pageId}]`;
+}
+
+/** Absolute Confluence URL. The macro iframe cannot use a relative /wiki path. */
+function pageHref(siteUrl: string | null, pageId: string): string | null {
+  if (!siteUrl || !/^\d{1,20}$/.test(pageId)) return null;
+  let url: URL;
+  try {
+    url = new URL(siteUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:') return null;
+  return `${url.origin}/wiki/pages/viewpage.action?pageId=${pageId}`;
+}
+
+function PageLabel({
+  pageId,
+  pageTitle,
+  href,
+}: {
+  pageId: string;
+  pageTitle: string | null;
+  href: string | null;
+}) {
+  const tip = pageTip(pageId, pageTitle);
+  const text = pageTitle ?? pageId;
+  return (
+    <>
+      {href ? (
+        <a className="ss-clip" href={href} target="_blank" rel="noopener noreferrer" title={tip}>
+          {text}
+        </a>
+      ) : (
+        <span className="ss-clip" title={tip}>
+          {text}
+        </span>
+      )}
+      <span className="ss-tip" role="tooltip">
+        {tip}
+      </span>
+    </>
+  );
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: 'warn' | 'info' }) {

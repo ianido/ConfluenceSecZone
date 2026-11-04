@@ -29,16 +29,20 @@ const data: MySections = {
 describe('My secure sections page column', () => {
   it('shows the page title, and the id plus the full title on hover', async () => {
     const api = scriptedApi({ listMySections: () => ({ ok: true, data }) });
-    renderWithI18n(<Home api={api} />);
+    renderWithI18n(<Home api={api} siteUrl="https://example.atlassian.net/wiki" />);
     const tip = `[2134310913] : ${longTitle}`;
-    const label = await screen.findByTitle(tip);
-    expect(label.textContent).toContain(longTitle);
+    const label = await screen.findByRole('link', { name: longTitle });
+    expect(label.getAttribute('href')).toBe(
+      'https://example.atlassian.net/wiki/pages/viewpage.action?pageId=2134310913',
+    );
+    expect(label.getAttribute('target')).toBe('_blank');
+    expect(label.getAttribute('rel')).toContain('noopener');
+    expect(label.getAttribute('title')).toBe(tip);
     expect(label.textContent).not.toContain('2134310913');
-    expect(label.className).toContain('ss-clip');
     expect(screen.getByRole('tooltip').textContent).toBe(tip);
   });
 
-  it('falls back to the page id when the title is unavailable', async () => {
+  it('does not link a page that no longer exists', async () => {
     const api = scriptedApi({
       listMySections: () => ({
         ok: true,
@@ -48,8 +52,10 @@ describe('My secure sections page column', () => {
         },
       }),
     });
-    renderWithI18n(<Home api={api} />);
+    renderWithI18n(<Home api={api} siteUrl="https://example.atlassian.net" />);
     const label = await screen.findByTitle('[2134310913]');
     expect(label.textContent).toBe('2134310913');
+    expect(label.tagName).toBe('SPAN');
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

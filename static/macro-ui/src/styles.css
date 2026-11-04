@@ -377,6 +377,14 @@ summary:focus-visible {
   white-space: nowrap;
   vertical-align: bottom;
 }
+.ss-home-table a.ss-clip {
+  color: #0c66e4;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ss-home-table a.ss-clip:hover {
+  color: #0055cc;
+}
 .ss-home-table .ss-tip {
   display: none;
   position: absolute;
