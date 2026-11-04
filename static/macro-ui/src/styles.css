@@ -364,6 +364,42 @@ summary:focus-visible {
   padding: 6px 8px;
   border-bottom: 1px solid var(--ss-border);
 }
+.ss-home-table .ss-page-cell {
+  position: relative;
+  overflow: visible;
+  max-width: 32vw;
+}
+.ss-home-table .ss-clip {
+  display: inline-block;
+  max-width: 32vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.ss-home-table .ss-tip {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  top: calc(100% - 2px);
+  width: max-content;
+  max-width: 70vw;
+  white-space: normal;
+  overflow: visible;
+  background: #172b4d;
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(9, 30, 66, 0.25);
+  pointer-events: none;
+}
+.ss-home-table .ss-page-cell:hover .ss-tip,
+.ss-home-table .ss-page-cell:focus-within .ss-tip {
+  display: block;
+}
 .ss-chip {
   display: inline-block;
   margin-left: 6px;

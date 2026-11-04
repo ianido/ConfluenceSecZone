@@ -1870,8 +1870,11 @@ export class SecureSectionService {
     for (const { section, role } of visible) {
       const s = section.value;
       let pageStatus: MySections['rows'][number]['pageStatus'] = 'UNKNOWN';
+      let pageTitle: string | null = null;
       try {
-        pageStatus = (await this.gateway.pageSummary(s.primaryPageId)).status;
+        const page = await this.gateway.pageSummary(s.primaryPageId);
+        pageStatus = page.status;
+        pageTitle = page.title;
       } catch (e) {
         if (!(e instanceof GatewayError)) throw e;
       }
@@ -1890,6 +1893,7 @@ export class SecureSectionService {
         title: s.title ?? null,
         classification: s.classification ?? null,
         pageId: s.primaryPageId,
+        pageTitle,
         spaceKey: s.spaceKey,
         pageStatus,
         role,

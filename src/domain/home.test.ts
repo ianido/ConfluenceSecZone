@@ -50,6 +50,8 @@ describe('my sections', () => {
       title: 'Roadmap',
       classification: 'CONFIDENTIAL',
       role: 'VIEW',
+      pageId: '1001',
+      pageTitle: 'Page 1001',
       pageStatus: 'OK',
     });
     expect(JSON.stringify(mine)).not.toContain('hidden-body-text');
@@ -69,6 +71,7 @@ describe('my sections', () => {
     w.gateway.setPageMissing('1001');
     const listed = await w.service.listMySections(site('alice'));
     expect(listed.rows[0]?.pageStatus).toBe('MISSING');
+    expect(listed.rows[0]?.pageTitle).toBeNull();
     await w.service.deleteOrphan(site('alice'), id, 'DELETE');
     const after = await w.service.listMySections(site('alice'));
     expect(after.rows).toHaveLength(0);

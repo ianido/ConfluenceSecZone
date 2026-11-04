@@ -300,6 +300,8 @@ export interface MySectionRow {
   title: string | null;
   classification: Classification | null;
   pageId: string;
+  /** Confluence page title when the page can be read. Null when the page is gone or the title is unavailable. */
+  pageTitle: string | null;
   spaceKey: string | null;
   pageStatus: PageStatus;
   role: Role;

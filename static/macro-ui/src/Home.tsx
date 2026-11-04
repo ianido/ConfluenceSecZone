@@ -40,7 +40,7 @@ export function Home({ api }: { api: Api }) {
       if (klass && r.classification !== klass) return false;
       if (orphansOnly && r.pageStatus !== 'MISSING') return false;
       if (!q) return true;
-      return [r.title, r.pageId, r.spaceKey, r.sectionId].some((v) =>
+      return [r.title, r.pageTitle, r.pageId, r.spaceKey, r.sectionId].some((v) =>
         (v ?? '').toLowerCase().includes(q),
       );
     });
@@ -110,7 +110,7 @@ export function Home({ api }: { api: Api }) {
           {t('home.orphansOnly')}
         </label>
       </form>
-      <table className="ss-grid">
+      <table className="ss-grid ss-home-table">
         <thead>
           <tr>
             <th>{t('meta.title.label')}</th>
@@ -128,7 +128,14 @@ export function Home({ api }: { api: Api }) {
               <td>
                 <strong>{r.title ?? t('home.untitled')}</strong>
               </td>
-              <td>{r.pageId}</td>
+              <td className="ss-page-cell">
+                <span className="ss-clip" title={pageTip(r.pageId, r.pageTitle)}>
+                  {r.pageTitle ?? r.pageId}
+                </span>
+                <span className="ss-tip" role="tooltip">
+                  {pageTip(r.pageId, r.pageTitle)}
+                </span>
+              </td>
               <td>{r.spaceKey ?? '—'}</td>
               <td>{r.classification ? <ClassificationBadge value={r.classification} /> : '—'}</td>
               <td>
@@ -204,6 +211,10 @@ export function Home({ api }: { api: Api }) {
       <p className="ss-muted">{t('home.activity.note')}</p>
     </main>
   );
+}
+
+function pageTip(pageId: string, pageTitle: string | null): string {
+  return pageTitle ? `[${pageId}] : ${pageTitle}` : `[${pageId}]`;
 }
 
 function Kpi({ label, value, tone }: { label: string; value: number; tone?: 'warn' | 'info' }) {

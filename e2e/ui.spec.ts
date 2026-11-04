@@ -175,6 +175,33 @@ test('Spanish locale renders accessibly', async ({ page }) => {
   await axe(page);
 });
 
+test('home page column shows the title and the full id on hover', async ({ page, request }) => {
+  const title =
+    'Engineering handbook for confidential planning across every product line and region';
+  const created = await request.post(
+    '/__invoke/createSection?actor=alice&pageId=1001&localId=aaaaaaaa-0000-4000-8000-000000000001',
+    { data: { title: 'Secrets', classification: 'RESTRICTED' } },
+  );
+  expect(created.ok()).toBeTruthy();
+  const named = await request.get(`/__page-title?pageId=1001&title=${encodeURIComponent(title)}`);
+  expect(named.ok()).toBeTruthy();
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await page.goto('/?surface=home&actor=alice');
+  const clip = page.locator('.ss-clip');
+  await expect(clip).toHaveText(title);
+  await expect(clip).toHaveAttribute('title', `[1001] : ${title}`);
+  const narrow = await clip.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  expect(narrow.scroll).toBeGreaterThan(narrow.client);
+  await clip.hover();
+  await expect(page.getByRole('tooltip')).toHaveText(`[1001] : ${title}`);
+  await page.screenshot({ path: '/opt/cursor/artifacts/home-page-title-narrow.png' });
+  await page.setViewportSize({ width: 1600, height: 720 });
+  const wide = await clip.evaluate((el) => el.clientWidth);
+  expect(wide).toBeGreaterThan(narrow.client);
+  await clip.hover();
+  await page.screenshot({ path: '/opt/cursor/artifacts/home-page-title-wide.png' });
+});
+
 test('keyboard: tabs are reachable and operable without a mouse', async ({ page }) => {
   await open(page, 'alice');
   await page.getByRole('button', { name: 'Set up secure section' }).click();

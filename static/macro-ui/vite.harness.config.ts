@@ -45,6 +45,14 @@ function backendHarness(): Plugin {
             res.end('ok');
             return;
           }
+          if (url.pathname === '/__page-title') {
+            const w = world ?? (await seed(), world!);
+            const id = url.searchParams.get('pageId') ?? '';
+            const title = url.searchParams.get('title') ?? '';
+            if (id && title) w.gateway.setPageTitle(id, title);
+            res.end('ok');
+            return;
+          }
           if (url.pathname === '/__failing') {
             const w = world ?? (await seed(), world!);
             if (url.searchParams.get('on') === '1') w.store.failReads = true;
