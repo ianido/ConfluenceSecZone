@@ -119,6 +119,18 @@ would be needed, which this product intentionally does not offer (no egress).
   second copy of ProseMirror from the bundle (944 KB -> 775 KB), which the Playwright test surfaced as a
   runtime "multiple versions of prosemirror-model" crash. `scripts/bundle-guard.mjs` now fails the build when more
   than one `prosemirror-model` copy is bundled.
+- **GHSA-w5hq-g745-h8pq** (`uuid` buffer bounds check, fixed in 11.1.1; GHSA-qmq6-f8pr-cx5x was withdrawn as a
+  duplicate), **GHSA-3g3m-2fjr-6pw4** (`glob` AbortSignal bypass, fixed in 14.0.2) and **GHSA-g3hv-75wg-m249**
+  (`minimatch` globparts amplification, fixed in 11.0.1): the dev-only `@forge/cli` tree pins `uuid@^8.3.2`
+  (via `sockjs`) and `glob@^13` (via `@forge/cli-shared` and `@forge/manifest`), blocking fixes within those ranges.
+  The existing `uuid@11.1.1` copy pulled by `@forge/bridge` is already patched. Applied
+  `overrides` for `uuid` (`^14.0.3`), `glob` (`^14.0.2`) and `minimatch` (`^11.0.1`, scoped to `readdir-glob` and
+  `@typescript-eslint/typescript-estree`). `uuid@14` and `glob@14` are ESM-first; they load from the CommonJS
+  `sockjs`/`glob` consumers through `require(esm)` (Node >= 22.12, the repo minimum) and `v4()`/`glob()` keep their
+  API. `minimatch@3.1.5` (ESLint, `eslint-plugin-jsx-a11y`, `recursive-readdir`) cannot move to 11 because those
+  packages call the module as a function, which 11 no longer exports; there is no patched 3.x release, so it
+  stays as a dev-only finding until ESLint and `eslint-plugin-jsx-a11y` drop it. Remove these overrides when
+  `@forge/cli` and `@forge/bridge` ship patched ranges.
 - `npm audit --omit=dev --audit-level=high` passes (6 moderate advisories remain in `glob`/`minimatch` pulled by
   `@forge/*` packages; not exploitable in our usage, tracked in docs/BLOCKERS.md B-005).
 - `npm audit` including dev dependencies reports critical/high findings only inside `@forge/cli` (developer tool,
