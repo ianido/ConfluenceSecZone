@@ -68,6 +68,20 @@ const en = {
   'admin.lockByDefault': 'Open sections locked',
   'admin.lockByDefault.help':
     'A section that already has content opens locked for everyone, including administrators. Unlock to read.',
+  'admin.reader.kicker': 'Reader appearance',
+  'admin.reader.help':
+    'These options apply to people who can view or edit. A section administrator still sees the title, the tabs and the actions.',
+  'admin.reader.notice': 'Show who granted access',
+  'admin.reader.notice.help':
+    'The note stays inside the section. Dismiss hides it for that person, and it does not come back.',
+  'admin.reader.reload': 'Show the Reload button',
+  'admin.reader.helpTab': 'Show the Help tab',
+  'admin.reader.helpTab.help':
+    'When Help is hidden and no other tab remains, the content is shown directly, without a tab bar.',
+  'admin.reader.saved': 'Show who last saved',
+  'admin.reader.title': 'Show the title',
+  'admin.reader.access': 'Show how many people and groups have access',
+  'admin.reader.access.help': 'Shown in the header. This has no effect while the title is hidden.',
   'admin.autolock.site': 'Inactivity auto-lock',
   'admin.autolock.help':
     'Restricted sections use this time. Adjust the others under Classifications.',
@@ -429,6 +443,21 @@ const es: Record<MessageKey, string> = {
   'admin.lockByDefault': 'Abrir las secciones bloqueadas',
   'admin.lockByDefault.help':
     'Una sección que ya tiene contenido se abre bloqueada para todos, incluidos los administradores. Hay que desbloquear para leer.',
+  'admin.reader.kicker': 'Apariencia para lectores',
+  'admin.reader.help':
+    'Estas opciones aplican a quien puede ver o editar. Un administrador de la sección sigue viendo el título, las pestañas y las acciones.',
+  'admin.reader.notice': 'Mostrar quién dio acceso',
+  'admin.reader.notice.help':
+    'La nota queda dentro de la sección. Descartar la oculta para esa persona y no vuelve a aparecer.',
+  'admin.reader.reload': 'Mostrar el botón Recargar',
+  'admin.reader.helpTab': 'Mostrar la pestaña Ayuda',
+  'admin.reader.helpTab.help':
+    'Si Ayuda está oculta y no queda otra pestaña, el contenido se muestra directo, sin la barra de pestañas.',
+  'admin.reader.saved': 'Mostrar quién guardó por última vez',
+  'admin.reader.title': 'Mostrar el título',
+  'admin.reader.access': 'Mostrar cuántas personas y grupos tienen acceso',
+  'admin.reader.access.help':
+    'Aparece en el encabezado. No tiene efecto mientras el título está oculto.',
   'admin.autolock.site': 'Auto-bloqueo por inactividad',
   'admin.autolock.help':
     'La clasificación Restringido usa este tiempo. Las demás se ajustan en Clasificaciones.',

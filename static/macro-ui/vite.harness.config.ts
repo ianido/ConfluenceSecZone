@@ -23,6 +23,7 @@ function backendHarness(): Plugin {
         const w = m.makeWorld();
         for (const u of ['alice', 'bob', 'carol', 'dave', 'erin'])
           w.gateway.addUser(u, u[0]!.toUpperCase() + u.slice(1));
+        w.gateway.siteAdmins.add('alice');
         w.gateway.addGroup('g-hr', 'HR', ['carol']);
         w.gateway.addGroup('g-eng', 'Engineering', ['dave']);
         const full = { canView: true, canEdit: true };

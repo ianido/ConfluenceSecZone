@@ -214,6 +214,63 @@ test('home page column shows the title and the full id on hover', async ({ page,
   await page.screenshot({ path: '/opt/cursor/artifacts/home-page-title-wide.png' });
 });
 
+test('a quiet reader policy leaves only the locked card', async ({ page, request, browser }) => {
+  const invoke = (fn: string, actor: string, data: unknown) =>
+    request.post(
+      `/__invoke/${fn}?actor=${actor}&pageId=1001&localId=aaaaaaaa-0000-4000-8000-000000000001`,
+      { data },
+    );
+  await open(page, 'alice');
+  await page.getByRole('button', { name: 'Set up secure section' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.locator('.ss-editor').click();
+  await page.keyboard.type('Quiet reader content');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('tab', { name: 'Content' })).toBeVisible();
+
+  await page.goto('/?actor=alice&surface=admin');
+  const titleSwitch = page.getByRole('checkbox', { name: 'Show the title' });
+  const accessSwitch = page.getByRole('checkbox', {
+    name: 'Show how many people and groups have access',
+  });
+  await expect(titleSwitch).toBeChecked();
+  await expect(accessSwitch).toBeChecked();
+  await titleSwitch.click();
+  await expect(accessSwitch).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Show who granted access' }).click();
+  await page.getByRole('checkbox', { name: 'Show the Reload button' }).click();
+  await page.getByRole('checkbox', { name: 'Show the Help tab' }).click();
+  await page.getByRole('checkbox', { name: 'Show who last saved' }).click();
+  await page.getByRole('heading', { name: 'Reader appearance' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/opt/cursor/artifacts/reader-appearance-settings.png' });
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Saved.')).toBeVisible();
+  const grant = await invoke('upsertGrant', 'alice', {
+    principalType: 'USER',
+    principalId: 'bob',
+    role: 'VIEW',
+    expectedAclVersion: 1,
+    expiresAt: null,
+  });
+  expect((await grant.json()).ok).toBe(true);
+
+  await open(page, 'alice');
+  await expect(page.getByRole('tab', { name: 'Help' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Secure section' })).toBeVisible();
+
+  const bob = await (await browser.newContext()).newPage();
+  await open(bob, 'bob');
+  await expect(bob.getByRole('heading', { name: /Unlock it to read/ })).toBeVisible();
+  await expect(bob.getByRole('button', { name: 'Unlock' })).toBeVisible();
+  await expect(bob.getByRole('tab')).toHaveCount(0);
+  await expect(bob.getByRole('button', { name: 'Reload' })).toHaveCount(0);
+  await expect(bob.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
+  await expect(bob.getByText(/Saved by/)).toHaveCount(0);
+  await expect(bob.getByText(/Access:/)).toHaveCount(0);
+  await bob.screenshot({ path: '/opt/cursor/artifacts/quiet-reader.png' });
+  await axe(bob);
+});
+
 test('keyboard: tabs are reachable and operable without a mouse', async ({ page }) => {
   await open(page, 'alice');
   await page.getByRole('button', { name: 'Set up secure section' }).click();

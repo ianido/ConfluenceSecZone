@@ -7,6 +7,7 @@
 import { createRoot } from 'react-dom/client';
 import { resolveLocale } from '@secure-sections/shared';
 import type { Api } from '../src/api';
+import { Admin } from '../src/Admin';
 import { App } from '../src/App';
 import { Home } from '../src/Home';
 import { I18nProvider } from '../src/i18n';
@@ -35,6 +36,12 @@ const api: Api = {
 
 createRoot(document.getElementById('root')!).render(
   <I18nProvider locale={locale}>
-    {surface === 'home' ? <Home api={api} siteUrl={siteUrl} /> : <App api={api} />}
+    {surface === 'home' ? (
+      <Home api={api} siteUrl={siteUrl} />
+    ) : surface === 'admin' ? (
+      <Admin api={api} />
+    ) : (
+      <App api={api} />
+    )}
   </I18nProvider>,
 );

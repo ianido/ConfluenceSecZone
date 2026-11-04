@@ -22,6 +22,7 @@ export function SectionHeader({
   meta,
   canAdminister,
   editingLocked,
+  showAccessCount,
   onMeta,
   onManage,
 }: {
@@ -29,6 +30,7 @@ export function SectionHeader({
   meta: SectionMeta;
   canAdminister: boolean;
   editingLocked: boolean;
+  showAccessCount: boolean;
   onMeta: (m: SectionMeta) => void;
   onManage: () => void;
 }) {
@@ -72,10 +74,12 @@ export function SectionHeader({
         </h2>
         <ClassificationBadge value={meta.classification} />
         <span className="ss-header-spacer" />
-        <span className="ss-muted ss-header-shared ss-shared">
-          <CountFaces users={meta.sharedWith.users} groups={meta.sharedWith.groups} />
-          {t('header.shared', { users: meta.sharedWith.users, groups: meta.sharedWith.groups })}
-        </span>
+        {showAccessCount && (
+          <span className="ss-muted ss-header-shared ss-shared">
+            <CountFaces users={meta.sharedWith.users} groups={meta.sharedWith.groups} />
+            {t('header.shared', { users: meta.sharedWith.users, groups: meta.sharedWith.groups })}
+          </span>
+        )}
         {canAdminister && (
           <>
             <button

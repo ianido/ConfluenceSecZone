@@ -164,6 +164,8 @@ export type SectionView =
       /** In-app note that this caller was granted access. Null when there is nothing to show. */
       notice: GrantNotice | null;
       protection: ProtectionFlags;
+      /** Site reader-chrome settings. Administrators still render the full chrome. */
+      viewer: ViewerChrome;
     };
 
 export interface GrantNotice {
@@ -280,6 +282,29 @@ export interface ClassPolicy {
 export type WhoMayCreate = 'PAGE_EDITORS' | 'SITE_ADMINS';
 
 /**
+ * What a person who can view or edit sees around the content.
+ * Section administrators always see the full chrome; the macro ignores these flags for them.
+ * `showAccessCount` has no effect unless `showTitle` is also on.
+ */
+export interface ViewerChrome {
+  showGrantNotice: boolean;
+  showReload: boolean;
+  showHelp: boolean;
+  showLastSaved: boolean;
+  showTitle: boolean;
+  showAccessCount: boolean;
+}
+
+export const DEFAULT_VIEWER_CHROME: ViewerChrome = {
+  showGrantNotice: true,
+  showReload: true,
+  showHelp: true,
+  showLastSaved: true,
+  showTitle: true,
+  showAccessCount: true,
+};
+
+/**
  * Site-wide knobs. Reader protection derived from this is deterrence only:
  * a watermark and a hidden selection do not stop a determined reader.
  */
@@ -291,6 +316,8 @@ export interface SitePolicy {
   lockByDefault: boolean;
   whoMayCreate: WhoMayCreate;
   classes: ClassPolicy[];
+  /** Global reader chrome. Does not change what a section administrator sees. */
+  viewer: ViewerChrome;
 }
 
 export type PageStatus = 'OK' | 'MISSING' | 'UNKNOWN';

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_VIEWER_CHROME,
   MAX_GRANT_TTL_DAYS,
   type AuditAction,
   type Classification,
@@ -33,6 +34,7 @@ export const DEFAULT_SITE_POLICY: SitePolicy = {
   requireChangeNote: false,
   lockByDefault: true,
   whoMayCreate: 'PAGE_EDITORS',
+  viewer: { ...DEFAULT_VIEWER_CHROME },
   classes: [
     { id: 'INTERNAL', watermark: false, autoLockMinutes: null, protectCopy: false },
     { id: 'CONFIDENTIAL', watermark: false, autoLockMinutes: null, protectCopy: false },

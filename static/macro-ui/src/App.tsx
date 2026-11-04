@@ -10,6 +10,7 @@ import {
   CLASSIFICATIONS,
   SECTION_TEMPLATES,
   TITLE_MAX_LENGTH,
+  DEFAULT_VIEWER_CHROME,
   docIsEmpty,
   isClassification,
   roleAtLeast,
@@ -22,6 +23,7 @@ import {
   type ProtectionFlags,
   type RichDoc,
   type SectionView,
+  type ViewerChrome,
 } from '@secure-sections/shared';
 import { ApiError, safeCall, unwrap, type Api } from './api';
 import { AccessRequestBox } from './Access';
@@ -514,6 +516,12 @@ function ProtectedReading({
   );
 }
 
+/** Administrators always see the full chrome. The access count needs the title. */
+function chromeFor(viewer: ViewerChrome, isAdmin: boolean): ViewerChrome {
+  if (isAdmin) return DEFAULT_VIEWER_CHROME;
+  return { ...viewer, showAccessCount: viewer.showTitle && viewer.showAccessCount };
+}
+
 function Ready({
   api,
   view,
@@ -530,6 +538,8 @@ function Ready({
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(0);
   const isAdmin = roleAtLeast(view.role, 'ADMINISTER');
+  const chrome = chromeFor(view.viewer, isAdmin);
+  const [noticeHidden, setNoticeHidden] = useState(false);
   const [locked, setLocked] = useState(
     () => view.protection.lockByDefault && !docIsEmpty(content.doc),
   );
@@ -548,10 +558,12 @@ function Ready({
     }
   }, [content.doc, content.version, view.protection.lockByDefault]);
   const tabs: Tab[] = ['content'];
-  if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('permissions');
+  if (isAdmin) tabs.push('permissions');
   if (roleAtLeast(view.role, 'MODIFY')) tabs.push('history');
-  if (roleAtLeast(view.role, 'ADMINISTER')) tabs.push('audit');
-  tabs.push('help');
+  if (isAdmin) tabs.push('audit');
+  if (chrome.showHelp) tabs.push('help');
+  const active = tabs.includes(tab) ? tab : 'content';
+  const bare = tabs.length === 1;
 
   useEffect(() => setContent(view.content), [view.content]);
   useEffect(() => setMeta(view.meta), [view.meta]);
@@ -573,9 +585,68 @@ function Ready({
     if (n && !editing) setTab(n);
   };
 
+  const reading = editing ? (
+    <EditPanel
+      api={api}
+      initial={content}
+      onSaved={(c) => {
+        setContent(c);
+        setEditing(false);
+        reload();
+      }}
+      onCancel={() => setEditing(false)}
+    />
+  ) : (
+    <section>
+      {docIsEmpty(content.doc) ? (
+        <p className="ss-muted">
+          <strong>{t('state.empty.title')}</strong> {t('state.empty.body')}
+        </p>
+      ) : (
+        <ProtectedReading
+          api={api}
+          doc={content.doc}
+          protection={view.protection}
+          locked={locked}
+          lockReason={lockReason}
+          onLock={lockIdle}
+          onUnlock={() => setLocked(false)}
+        />
+      )}
+      {chrome.showLastSaved && (
+        <p className="ss-muted ss-saved">
+          {t('content.savedBy', {
+            name: content.updatedBy?.displayName ?? '—',
+            when: new Date(content.updatedAt).toLocaleString(),
+            version: content.version,
+          })}
+        </p>
+      )}
+      {((view.canWrite && !locked) ||
+        chrome.showReload ||
+        (roleAtLeast(view.role, 'MODIFY') && !view.canEditPage)) && (
+        <div className="ss-actions">
+          {view.canWrite && !locked && (
+            <button type="button" className="ss-btn ss-primary" onClick={() => setEditing(true)}>
+              {t('action.edit')}
+            </button>
+          )}
+          {roleAtLeast(view.role, 'MODIFY') && !view.canEditPage && (
+            <span className="ss-muted">{t('editor.pageEditRequired')}</span>
+          )}
+          {chrome.showReload && (
+            <button type="button" className="ss-btn" onClick={reload}>
+              {t('action.reload')}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+
   return (
     <div className="ss-shell">
-      {view.notice && (
+      {chrome.showGrantNotice && view.notice && !noticeHidden && (
         <div className="ss-callout" role="status">
           <p>
             {t('notice.added', {
@@ -587,6 +658,7 @@ function Ready({
             type="button"
             className="ss-btn"
             onClick={() => {
+              setNoticeHidden(true);
               void safeCall(api, 'dismissNotice', {}).then(() => reload());
             }}
           >
@@ -594,110 +666,65 @@ function Ready({
           </button>
         </div>
       )}
-      <SectionHeader
-        api={api}
-        meta={meta}
-        canAdminister={roleAtLeast(view.role, 'ADMINISTER')}
-        editingLocked={editing}
-        onMeta={setMeta}
-        onManage={() => setTab('permissions')}
-      />
-      <div role="tablist" aria-label={t('app.title')} className="ss-tabs">
-        {tabs.map((id, i) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`ss-tab-${id}`}
-            aria-selected={tab === id}
-            aria-controls={`ss-pane-${id}`}
-            tabIndex={tab === id ? 0 : -1}
-            className="ss-tab"
-            disabled={editing && tab !== id}
-            onClick={() => setTab(id)}
-            onKeyDown={(e) => onKey(e, i)}
-          >
-            {t(`nav.${id === 'audit' ? 'audit' : id}`)}
-            {id === 'permissions' && pending > 0 && (
-              <span
-                className="ss-count"
-                role="img"
-                aria-label={`${pending} ${t('requests.badge')}`}
+      {chrome.showTitle && (
+        <SectionHeader
+          api={api}
+          meta={meta}
+          canAdminister={isAdmin}
+          showAccessCount={chrome.showAccessCount}
+          editingLocked={editing}
+          onMeta={setMeta}
+          onManage={() => setTab('permissions')}
+        />
+      )}
+      {bare ? (
+        reading
+      ) : (
+        <>
+          <div role="tablist" aria-label={t('app.title')} className="ss-tabs">
+            {tabs.map((id, i) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`ss-tab-${id}`}
+                aria-selected={active === id}
+                aria-controls={`ss-pane-${id}`}
+                tabIndex={active === id ? 0 : -1}
+                className="ss-tab"
+                disabled={editing && active !== id}
+                onClick={() => setTab(id)}
+                onKeyDown={(e) => onKey(e, i)}
               >
-                {pending}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      <div role="tabpanel" id={`ss-pane-${tab}`} aria-labelledby={`ss-tab-${tab}`}>
-        {tab === 'content' &&
-          (editing ? (
-            <EditPanel
-              api={api}
-              initial={content}
-              onSaved={(c) => {
-                setContent(c);
-                setEditing(false);
-                reload();
-              }}
-              onCancel={() => setEditing(false)}
-            />
-          ) : (
-            <section>
-              {docIsEmpty(content.doc) ? (
-                <p className="ss-muted">
-                  <strong>{t('state.empty.title')}</strong> {t('state.empty.body')}
-                </p>
-              ) : (
-                <ProtectedReading
-                  api={api}
-                  doc={content.doc}
-                  protection={view.protection}
-                  locked={locked}
-                  lockReason={lockReason}
-                  onLock={lockIdle}
-                  onUnlock={() => setLocked(false)}
-                />
-              )}
-              <p className="ss-muted ss-saved">
-                {t('content.savedBy', {
-                  name: content.updatedBy?.displayName ?? '—',
-                  when: new Date(content.updatedAt).toLocaleString(),
-                  version: content.version,
-                })}
-              </p>
-              <div className="ss-actions">
-                {view.canWrite && !locked && (
-                  <button
-                    type="button"
-                    className="ss-btn ss-primary"
-                    onClick={() => setEditing(true)}
+                {t(`nav.${id === 'audit' ? 'audit' : id}`)}
+                {id === 'permissions' && pending > 0 && (
+                  <span
+                    className="ss-count"
+                    role="img"
+                    aria-label={`${pending} ${t('requests.badge')}`}
                   >
-                    {t('action.edit')}
-                  </button>
+                    {pending}
+                  </span>
                 )}
-                {roleAtLeast(view.role, 'MODIFY') && !view.canEditPage && (
-                  <span className="ss-muted">{t('editor.pageEditRequired')}</span>
-                )}
-                <button type="button" className="ss-btn" onClick={reload}>
-                  {t('action.reload')}
-                </button>
-              </div>
-            </section>
-          ))}
-        {tab === 'permissions' && <PermissionsPanel api={api} onPending={setPending} />}
-        {tab === 'history' && (
-          <HistoryPanel
-            api={api}
-            baseVersion={content.version}
-            canWrite={view.canWrite}
-            onRestored={reload}
-          />
-        )}
-        {tab === 'audit' && <AuditPanel api={api} />}
-        {tab === 'help' && <HelpPanel api={api} userRole={view.role} />}
-      </div>
+              </button>
+            ))}
+          </div>
+          <div role="tabpanel" id={`ss-pane-${active}`} aria-labelledby={`ss-tab-${active}`}>
+            {active === 'content' && reading}
+            {active === 'permissions' && <PermissionsPanel api={api} onPending={setPending} />}
+            {active === 'history' && (
+              <HistoryPanel
+                api={api}
+                baseVersion={content.version}
+                canWrite={view.canWrite}
+                onRestored={reload}
+              />
+            )}
+            {active === 'audit' && <AuditPanel api={api} />}
+            {active === 'help' && <HelpPanel api={api} userRole={view.role} />}
+          </div>
+        </>
+      )}
     </div>
   );
 }

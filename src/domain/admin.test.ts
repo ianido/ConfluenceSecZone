@@ -90,6 +90,38 @@ describe('site administration', () => {
     expect(again).toMatchObject({ protection: { lockByDefault: true } });
   });
 
+  it('stores reader chrome and treats a missing value as everything shown', async () => {
+    const w = await world();
+    const alice = ctxFor('alice');
+    await w.service.createSection(alice, 'Plan', 'INTERNAL');
+    const overview = await w.service.getAdminOverview(site('alice'));
+    expect(overview.policy.viewer).toEqual(DEFAULT_SITE_POLICY.viewer);
+    const quiet = {
+      showGrantNotice: false,
+      showReload: false,
+      showHelp: false,
+      showLastSaved: false,
+      showTitle: false,
+      showAccessCount: true,
+    };
+    const saved = await w.service.updateSitePolicy(
+      site('alice'),
+      { ...overview.policy, viewer: quiet },
+      overview.retention,
+    );
+    expect(saved.policy.viewer).toEqual(quiet);
+    const view = await w.service.getSection(alice);
+    expect(view).toMatchObject({ state: 'READY', viewer: quiet });
+
+    w.store.tamper('meta', Keys.meta('site-policy'), (value) => {
+      const doc = value as { value: Record<string, unknown> };
+      delete doc.value.viewer;
+      return doc;
+    });
+    const again = await w.service.getSection(alice);
+    expect(again).toMatchObject({ viewer: DEFAULT_SITE_POLICY.viewer });
+  });
+
   it('lists a section with no active administrator and recovers it without returning content', async () => {
     const w = await world();
     const alice = ctxFor('alice');

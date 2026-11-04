@@ -711,6 +711,12 @@ select {
   outline: 2px solid var(--ss-focus);
   outline-offset: 2px;
 }
+.ss-switch input:disabled {
+  cursor: not-allowed;
+}
+.ss-switch input:disabled + span {
+  opacity: 0.45;
+}
 .ss-retention-row,
 .ss-class-pills,
 .ss-kpi-row {
