@@ -117,17 +117,14 @@ function AddAccessDialog({
   api,
   onClose,
   onAdd,
-  onError,
 }: {
   api: Api;
   onClose: () => void;
   onAdd: (hits: PrincipalHit[], role: Role, expiresAt: string | null) => void;
-  onError: (text: string) => void;
 }) {
   const t = useT();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
+  const requestId = useRef(0);
   const [kind, setKind] = useState<PrincipalType>('USER');
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<PrincipalHit[]>([]);
@@ -136,6 +133,7 @@ function AddAccessDialog({
   const [picked, setPicked] = useState<PrincipalHit[]>([]);
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     const el = dialogRef.current;
@@ -149,28 +147,41 @@ function AddAccessDialog({
   }, []);
 
   const runSearch = useCallback(
-    async (q: string, type: PrincipalType) => {
+    async (q: string, type: PrincipalType, id: number) => {
       const trimmed = q.trim();
+      if (id !== requestId.current) return;
       if (trimmed.length < 2) {
         setHits([]);
         setSearched(false);
+        setBusy(false);
+        setSearchError(null);
         return;
       }
       setBusy(true);
+      setSearchError(null);
       const res = await safeCall(api, 'searchPrincipals', { query: trimmed, type });
+      if (id !== requestId.current) return;
       setBusy(false);
       if (res.ok) {
         setHits(res.data.hits);
         setSearched(true);
-      } else onErrorRef.current(errorText(new ApiError(res.code), t));
+      } else setSearchError(errorText(new ApiError(res.code), t));
     },
     [api, t],
   );
 
   useEffect(() => {
-    const id = window.setTimeout(() => void runSearch(query, kind), 300);
-    return () => window.clearTimeout(id);
+    const id = ++requestId.current;
+    const timer = window.setTimeout(() => void runSearch(query, kind, id), 300);
+    return () => window.clearTimeout(timer);
   }, [query, kind, runSearch]);
+
+  useEffect(
+    () => () => {
+      requestId.current += 1;
+    },
+    [],
+  );
 
   const toggle = (hit: PrincipalHit) => {
     setPicked((cur) => {
@@ -196,7 +207,8 @@ function AddAccessDialog({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void runSearch(query, kind);
+          const id = ++requestId.current;
+          void runSearch(query, kind, id);
         }}
       >
         <div className="ss-add-fields">
@@ -209,6 +221,7 @@ function AddAccessDialog({
                 setHits([]);
                 setPicked([]);
                 setSearched(false);
+                setSearchError(null);
               }}
             >
               <option value="USER">{t('perm.user')}</option>
@@ -259,6 +272,11 @@ function AddAccessDialog({
           {searchLabel}
         </button>
       </form>
+      {searchError && (
+        <p className="ss-err" role="alert">
+          {searchError}
+        </p>
+      )}
       {busy && <p className="ss-muted">{t('perm.searching')}</p>}
       {!busy && !searched && query.trim().length < 2 && (
         <p className="ss-muted">{t('perm.search.hint')}</p>
@@ -547,7 +565,6 @@ export function PermissionsPanel({
         <AddAccessDialog
           api={api}
           onClose={() => setAddOpen(false)}
-          onError={(text) => setNotice({ kind: 'err', text })}
           onAdd={(hits, role, expiresAt) => {
             setAddOpen(false);
             if (role === 'ADMINISTER') {

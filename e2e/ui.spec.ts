@@ -80,7 +80,7 @@ test('author creates, edits and shares a section; unauthorised editor sees nothi
   await addDialog.getByRole('button', { name: 'Search people' }).click();
   await expect(addDialog.getByRole('checkbox', { name: 'Bob' })).toBeVisible();
   await addDialog.getByRole('checkbox', { name: 'Bob' }).check();
-  await page.screenshot({ path: '/opt/cursor/artifacts/add-access-dialog.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/add-access-dialog.png', fullPage: true });
   await axe(page);
   await addDialog.getByRole('button', { name: /Add selected/ }).click();
   await expect(page.getByText('Permissions updated.')).toBeVisible();
@@ -206,12 +206,12 @@ test('home page column shows the title and the full id on hover', async ({ page,
   expect(narrow.scroll).toBeGreaterThan(narrow.client);
   await clip.hover();
   await expect(page.getByRole('tooltip')).toHaveText(`[1001] : ${title}`);
-  await page.screenshot({ path: '/opt/cursor/artifacts/home-page-title-narrow.png' });
+  await page.screenshot({ path: 'test-results/home-page-title-narrow.png' });
   await page.setViewportSize({ width: 1600, height: 720 });
   const wide = await clip.evaluate((el) => el.clientWidth);
   expect(wide).toBeGreaterThan(narrow.client);
   await clip.hover();
-  await page.screenshot({ path: '/opt/cursor/artifacts/home-page-title-wide.png' });
+  await page.screenshot({ path: 'test-results/home-page-title-wide.png' });
 });
 
 test('a quiet reader policy leaves only the locked card', async ({ page, request, browser }) => {
@@ -242,7 +242,7 @@ test('a quiet reader policy leaves only the locked card', async ({ page, request
   await page.getByRole('checkbox', { name: 'Show the Help tab' }).click();
   await page.getByRole('checkbox', { name: 'Show who last saved' }).click();
   await page.getByRole('heading', { name: 'Reader appearance' }).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: '/opt/cursor/artifacts/reader-appearance-settings.png' });
+  await page.screenshot({ path: 'test-results/reader-appearance-settings.png' });
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
   const grant = await invoke('upsertGrant', 'alice', {
@@ -267,7 +267,7 @@ test('a quiet reader policy leaves only the locked card', async ({ page, request
   await expect(bob.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
   await expect(bob.getByText(/Saved by/)).toHaveCount(0);
   await expect(bob.getByText(/Access:/)).toHaveCount(0);
-  await bob.screenshot({ path: '/opt/cursor/artifacts/quiet-reader.png' });
+  await bob.screenshot({ path: 'test-results/quiet-reader.png' });
   await axe(bob);
 });
 

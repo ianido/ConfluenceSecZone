@@ -22,6 +22,15 @@ export function Home({
   const [klass, setKlass] = useState<Classification | ''>('');
   const [orphansOnly, setOrphansOnly] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [navError, setNavError] = useState<string | null>(null);
+  const open = async (pageId: string, href: string) => {
+    try {
+      await openPage(pageId, href);
+      setNavError(null);
+    } catch {
+      setNavError(t('error.generic'));
+    }
+  };
 
   const load = () => {
     setError(null);
@@ -118,6 +127,11 @@ export function Home({
           {t('home.orphansOnly')}
         </label>
       </form>
+      {navError && (
+        <p className="ss-err" role="alert">
+          {navError}
+        </p>
+      )}
       <table className="ss-grid ss-home-table">
         <thead>
           <tr>
@@ -141,7 +155,7 @@ export function Home({
                   pageId={r.pageId}
                   pageTitle={r.pageTitle}
                   href={r.pageStatus === 'MISSING' ? null : pageHref(siteUrl, r.pageId)}
-                  openPage={openPage}
+                  openPage={open}
                 />
               </td>
               <td>{r.spaceKey ?? '—'}</td>
@@ -229,13 +243,9 @@ function pageTip(pageId: string, pageTitle: string | null): string {
  * Same-window navigation. A plain anchor cannot leave the Forge iframe, and a new tab is blocked
  * there, so the click asks Confluence to open the page in the current tab.
  */
-export async function openConfluencePage(pageId: string, href: string): Promise<void> {
-  try {
-    const { router } = await import('@forge/bridge');
-    await router.navigate({ target: 'contentView', contentId: pageId });
-  } catch {
-    window.location.assign(href);
-  }
+export async function openConfluencePage(pageId: string, _href: string): Promise<void> {
+  const { router } = await import('@forge/bridge');
+  await router.navigate({ target: 'contentView', contentId: pageId });
 }
 
 /** Absolute Confluence URL. The macro iframe cannot use a relative /wiki path. */

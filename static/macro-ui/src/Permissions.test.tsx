@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EffectiveAccess, GrantList, PrincipalHit } from '@secure-sections/shared';
 import { PermissionsPanel } from './Panels';
@@ -107,5 +107,49 @@ describe('Add access dialog', () => {
         expiresAt: null,
       },
     ]);
+  });
+
+  it('shows a search failure inside the dialog and ignores a stale result', async () => {
+    const user = userEvent.setup();
+    let releaseStale: (value: { ok: true; data: { hits: PrincipalHit[] } }) => void = () => {};
+    let heldUser = false;
+    const api = scriptedApi({
+      listGrants: () => ({ ok: true, data: grants }),
+      getEffectiveAccess: () => ({ ok: true, data: access }),
+      listAccessRequests: () => ({ ok: true, data: { requests: [], aclVersion: 1 } }),
+      searchPrincipals: (payload) => {
+        const type = (payload as { type?: string }).type;
+        if (type === 'USER' && !heldUser) {
+          heldUser = true;
+          return new Promise((resolve) => {
+            releaseStale = resolve;
+          });
+        }
+        if (type === 'GROUP') {
+          return {
+            ok: true,
+            data: { hits: [{ principalType: 'GROUP', principalId: 'g', label: 'HR' }] },
+          };
+        }
+        return { ok: false, code: 'UNAVAILABLE' };
+      },
+    });
+    renderWithI18n(<PermissionsPanel api={api} />);
+    await user.click(await screen.findByRole('button', { name: 'Add access' }));
+    await user.type(screen.getByRole('searchbox'), 'Bo');
+    await user.click(screen.getByRole('button', { name: 'Search people' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Person / Group' }), 'GROUP');
+    await user.click(screen.getByRole('button', { name: 'Search groups' }));
+    expect(await screen.findByRole('checkbox', { name: 'HR' })).toBeTruthy();
+    await act(async () => {
+      releaseStale({ ok: true, data: { hits: [bob] } });
+    });
+    expect(screen.queryByRole('checkbox', { name: 'Bob' })).toBeNull();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Person / Group' }), 'USER');
+    await user.click(screen.getByRole('button', { name: 'Search people' }));
+    expect(screen.getByRole('dialog', { name: 'Add access' }).textContent).toContain(
+      'Something went wrong',
+    );
   });
 });

@@ -659,7 +659,10 @@ function Ready({
             className="ss-btn"
             onClick={() => {
               setNoticeHidden(true);
-              void safeCall(api, 'dismissNotice', {}).then(() => reload());
+              void safeCall(api, 'dismissNotice', {}).then((res) => {
+                if (res.ok) reload();
+                else setNoticeHidden(false);
+              });
             }}
           >
             {t('notice.dismiss')}

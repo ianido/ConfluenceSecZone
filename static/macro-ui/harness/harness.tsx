@@ -37,7 +37,13 @@ const api: Api = {
 createRoot(document.getElementById('root')!).render(
   <I18nProvider locale={locale}>
     {surface === 'home' ? (
-      <Home api={api} siteUrl={siteUrl} />
+      <Home
+        api={api}
+        siteUrl={siteUrl}
+        openPage={(_pageId, href) => {
+          window.location.assign(href);
+        }}
+      />
     ) : surface === 'admin' ? (
       <Admin api={api} />
     ) : (

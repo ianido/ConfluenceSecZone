@@ -68,4 +68,20 @@ describe('My secure sections page column', () => {
     expect(label.tagName).toBe('SPAN');
     expect(screen.queryByRole('link')).toBeNull();
   });
+
+  it('keeps the list on screen when opening the page fails', async () => {
+    const api = scriptedApi({ listMySections: () => ({ ok: true, data }) });
+    renderWithI18n(
+      <Home
+        api={api}
+        siteUrl="https://example.atlassian.net"
+        openPage={() => {
+          throw new Error('bridge');
+        }}
+      />,
+    );
+    await userEvent.click(await screen.findByRole('link', { name: longTitle }));
+    expect(screen.getByRole('alert').textContent).toContain('Something went wrong');
+    expect(screen.getByRole('link', { name: longTitle })).toBeTruthy();
+  });
 });

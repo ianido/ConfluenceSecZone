@@ -302,6 +302,22 @@ describe('App states', () => {
     expect(api.calls.some((c) => c.fn === 'dismissNotice')).toBe(true);
   });
 
+  it('keeps the grant note visible when dismissal does not persist', async () => {
+    const api = scriptedApi({
+      getSection: () =>
+        readyView({
+          role: 'VIEW',
+          canWrite: false,
+          notice: { role: 'VIEW', addedByName: 'Israel Garcia', at: '2026-01-01T00:00:00.000Z' },
+        }),
+      dismissNotice: () => ({ ok: false, code: 'UNAVAILABLE' }),
+    });
+    renderWithI18n(<App api={api} />);
+    expect(await screen.findByText(/Israel Garcia gave you access/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(await screen.findByText(/Israel Garcia gave you access/)).toBeTruthy();
+  });
+
   it('renders in Spanish', async () => {
     const api = scriptedApi({ getSection: () => ({ state: 'DENIED' }) });
     renderWithI18n(<App api={api} />, 'es');

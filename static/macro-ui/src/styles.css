@@ -402,7 +402,6 @@ summary:focus-visible {
   font-size: 12px;
   line-height: 1.4;
   box-shadow: 0 4px 12px rgba(9, 30, 66, 0.25);
-  pointer-events: none;
 }
 .ss-home-table .ss-page-cell:hover .ss-tip,
 .ss-home-table .ss-page-cell:focus-within .ss-tip {
