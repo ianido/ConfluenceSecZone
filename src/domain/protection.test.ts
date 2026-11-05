@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Keys } from './model';
 import { ctxFor, makeWorld, type World } from '../testing/world';
 
 const secretDoc = {
@@ -40,6 +41,20 @@ describe('reader protection flags', () => {
     expect(internal).toMatchObject({
       protection: { watermark: false, autoLockMinutes: null, protectCopy: false },
     });
+  });
+
+  it('reads the site policy once while building a section view', async () => {
+    const w = await world();
+    const alice = ctxFor('alice');
+    await w.service.createSection(alice, 'Plan', 'RESTRICTED');
+    let policyReads = 0;
+    const get = w.store.get.bind(w.store);
+    w.store.get = (async (entity, key) => {
+      if (key === Keys.meta('site-policy')) policyReads += 1;
+      return get(entity, key);
+    }) as typeof w.store.get;
+    await w.service.getSection(alice);
+    expect(policyReads).toBe(1);
   });
 
   it('audits a secret reveal without storing the secret', async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FocusEvent } from 'react';
 import type { Classification, MySections } from '@secure-sections/shared';
 import { CLASSIFICATIONS } from '@secure-sections/shared';
 import { safeCall, unwrap, type Api } from './api';
@@ -274,8 +274,41 @@ function PageLabel({
 }) {
   const tip = pageTip(pageId, pageTitle);
   const text = pageTitle ?? pageId;
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const open = (hovered || focused) && !dismissed;
+
+  useEffect(() => {
+    if (!hovered && !focused) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setDismissed(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hovered, focused]);
+
+  useEffect(() => {
+    if (!hovered && !focused) setDismissed(false);
+  }, [hovered, focused]);
+
+  const leaveFocus = (event: FocusEvent<HTMLSpanElement>) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) return;
+    setFocused(false);
+  };
+
   return (
-    <>
+    <span
+      className={open ? 'ss-page-label ss-tip-open' : 'ss-page-label'}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={leaveFocus}
+    >
       {href ? (
         <a
           className="ss-clip"
@@ -299,14 +332,14 @@ function PageLabel({
           {text}
         </a>
       ) : (
-        <span className="ss-clip" title={tip}>
+        <button type="button" className="ss-clip" title={tip}>
           {text}
-        </span>
+        </button>
       )}
       <span className="ss-tip" role="tooltip">
         {tip}
       </span>
-    </>
+    </span>
   );
 }
 

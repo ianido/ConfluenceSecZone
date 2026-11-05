@@ -380,8 +380,11 @@ export class SecureSectionService {
     };
   }
 
-  private async protectionFor(s: SectionDoc, accountId: string): Promise<ProtectionFlags> {
-    const policy = await this.readSitePolicy();
+  private async protectionFor(
+    s: SectionDoc,
+    accountId: string,
+    policy: SitePolicy,
+  ): Promise<ProtectionFlags> {
     const row = s.classification
       ? policy.classes.find((c) => c.id === s.classification)
       : undefined;
@@ -458,7 +461,7 @@ export class SecureSectionService {
         r,
         content,
         await this.noticeFor(r.section.value, accountId),
-        await this.protectionFor(r.section.value, accountId),
+        await this.protectionFor(r.section.value, accountId, policy),
         policy.viewer,
       );
     } catch (e) {
