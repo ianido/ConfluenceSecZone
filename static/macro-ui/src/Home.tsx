@@ -6,7 +6,15 @@ import { ClassificationBadge } from './Header';
 import { useT } from './i18n';
 import { CountFaces, LockIcon, Pill } from './visual';
 
-export function Home({ api }: { api: Api }) {
+export function Home({
+  api,
+  siteUrl = null,
+  openPage = openConfluencePage,
+}: {
+  api: Api;
+  siteUrl?: string | null;
+  openPage?: (pageId: string, href: string) => void | Promise<void>;
+}) {
   const t = useT();
   const [data, setData] = useState<MySections | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -14,6 +22,15 @@ export function Home({ api }: { api: Api }) {
   const [klass, setKlass] = useState<Classification | ''>('');
   const [orphansOnly, setOrphansOnly] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [navError, setNavError] = useState<string | null>(null);
+  const open = async (pageId: string, href: string) => {
+    try {
+      await openPage(pageId, href);
+      setNavError(null);
+    } catch {
+      setNavError(t('error.generic'));
+    }
+  };
 
   const load = () => {
     setError(null);
@@ -40,7 +57,7 @@ export function Home({ api }: { api: Api }) {
       if (klass && r.classification !== klass) return false;
       if (orphansOnly && r.pageStatus !== 'MISSING') return false;
       if (!q) return true;
-      return [r.title, r.pageId, r.spaceKey, r.sectionId].some((v) =>
+      return [r.title, r.pageTitle, r.pageId, r.spaceKey, r.sectionId].some((v) =>
         (v ?? '').toLowerCase().includes(q),
       );
     });
@@ -110,7 +127,12 @@ export function Home({ api }: { api: Api }) {
           {t('home.orphansOnly')}
         </label>
       </form>
-      <table className="ss-grid">
+      {navError && (
+        <p className="ss-err" role="alert">
+          {navError}
+        </p>
+      )}
+      <table className="ss-grid ss-home-table">
         <thead>
           <tr>
             <th>{t('meta.title.label')}</th>
@@ -128,7 +150,14 @@ export function Home({ api }: { api: Api }) {
               <td>
                 <strong>{r.title ?? t('home.untitled')}</strong>
               </td>
-              <td>{r.pageId}</td>
+              <td className="ss-page-cell">
+                <PageLabel
+                  pageId={r.pageId}
+                  pageTitle={r.pageTitle}
+                  href={r.pageStatus === 'MISSING' ? null : pageHref(siteUrl, r.pageId)}
+                  openPage={open}
+                />
+              </td>
               <td>{r.spaceKey ?? '—'}</td>
               <td>{r.classification ? <ClassificationBadge value={r.classification} /> : '—'}</td>
               <td>
@@ -203,6 +232,81 @@ export function Home({ api }: { api: Api }) {
       </ul>
       <p className="ss-muted">{t('home.activity.note')}</p>
     </main>
+  );
+}
+
+function pageTip(pageId: string, pageTitle: string | null): string {
+  return pageTitle ? `[${pageId}] : ${pageTitle}` : `[${pageId}]`;
+}
+
+/**
+ * Same-window navigation. A plain anchor cannot leave the Forge iframe, and a new tab is blocked
+ * there, so the click asks Confluence to open the page in the current tab.
+ */
+export async function openConfluencePage(pageId: string, _href: string): Promise<void> {
+  const { router } = await import('@forge/bridge');
+  await router.navigate({ target: 'contentView', contentId: pageId });
+}
+
+/** Absolute Confluence URL. The macro iframe cannot use a relative /wiki path. */
+function pageHref(siteUrl: string | null, pageId: string): string | null {
+  if (!siteUrl || !/^\d{1,20}$/.test(pageId)) return null;
+  let url: URL;
+  try {
+    url = new URL(siteUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:') return null;
+  return `${url.origin}/wiki/pages/viewpage.action?pageId=${pageId}`;
+}
+
+function PageLabel({
+  pageId,
+  pageTitle,
+  href,
+  openPage,
+}: {
+  pageId: string;
+  pageTitle: string | null;
+  href: string | null;
+  openPage: (pageId: string, href: string) => void | Promise<void>;
+}) {
+  const tip = pageTip(pageId, pageTitle);
+  const text = pageTitle ?? pageId;
+  return (
+    <>
+      {href ? (
+        <a
+          className="ss-clip"
+          href={href}
+          title={tip}
+          onClick={(event) => {
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            ) {
+              return;
+            }
+            event.preventDefault();
+            void openPage(pageId, href);
+          }}
+        >
+          {text}
+        </a>
+      ) : (
+        <span className="ss-clip" title={tip}>
+          {text}
+        </span>
+      )}
+      <span className="ss-tip" role="tooltip">
+        {tip}
+      </span>
+    </>
   );
 }
 

@@ -23,6 +23,7 @@ function backendHarness(): Plugin {
         const w = m.makeWorld();
         for (const u of ['alice', 'bob', 'carol', 'dave', 'erin'])
           w.gateway.addUser(u, u[0]!.toUpperCase() + u.slice(1));
+        w.gateway.siteAdmins.add('alice');
         w.gateway.addGroup('g-hr', 'HR', ['carol']);
         w.gateway.addGroup('g-eng', 'Engineering', ['dave']);
         const full = { canView: true, canEdit: true };
@@ -42,6 +43,14 @@ function backendHarness(): Plugin {
         try {
           if (url.pathname === '/__reset') {
             await seed();
+            res.end('ok');
+            return;
+          }
+          if (url.pathname === '/__page-title') {
+            const w = world ?? (await seed(), world!);
+            const id = url.searchParams.get('pageId') ?? '';
+            const title = url.searchParams.get('title') ?? '';
+            if (id && title) w.gateway.setPageTitle(id, title);
             res.end('ok');
             return;
           }

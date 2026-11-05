@@ -7,7 +7,9 @@
 import { createRoot } from 'react-dom/client';
 import { resolveLocale } from '@secure-sections/shared';
 import type { Api } from '../src/api';
+import { Admin } from '../src/Admin';
 import { App } from '../src/App';
+import { Home } from '../src/Home';
 import { I18nProvider } from '../src/i18n';
 import '../src/styles.css';
 
@@ -16,6 +18,8 @@ const actor = q.get('actor') ?? 'alice';
 const pageId = q.get('page') ?? '1001';
 const localId = q.get('local') ?? 'aaaaaaaa-0000-4000-8000-000000000001';
 const locale = resolveLocale(q.get('locale') ?? 'en');
+const surface = q.get('surface') ?? 'macro';
+const siteUrl = q.get('site') ?? 'https://example.atlassian.net';
 if (q.get('dark') === '1') document.documentElement.dataset.theme = 'dark';
 
 const api: Api = {
@@ -32,6 +36,18 @@ const api: Api = {
 
 createRoot(document.getElementById('root')!).render(
   <I18nProvider locale={locale}>
-    <App api={api} />
+    {surface === 'home' ? (
+      <Home
+        api={api}
+        siteUrl={siteUrl}
+        openPage={(_pageId, href) => {
+          window.location.assign(href);
+        }}
+      />
+    ) : surface === 'admin' ? (
+      <Admin api={api} />
+    ) : (
+      <App api={api} />
+    )}
   </I18nProvider>,
 );

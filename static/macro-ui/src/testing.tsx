@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { render } from '@testing-library/react';
 import {
+  DEFAULT_VIEWER_CHROME,
   EMPTY_DOC,
   type RequestOf,
   type ResolverFunction,
@@ -46,6 +47,7 @@ export function readyView(
       viewerName: 'Alice',
       lockByDefault: true,
     },
+    viewer: { ...DEFAULT_VIEWER_CHROME },
     content: {
       doc: {
         type: 'doc',

@@ -19,6 +19,7 @@ export class FakeConfluence implements ConfluenceGateway {
   private pages = new Map<string, Map<string, PagePermissions>>();
   private restrictions = new Map<string, PageRestrictionHit[]>();
   private missingPages = new Set<string>();
+  private pageTitles = new Map<string, string>();
   private userDir = new Map<string, UserInfo>();
   private groupDir = new Map<string, { info: GroupInfo; members: Set<string> }>();
   siteAdmins = new Set<string>();
@@ -59,6 +60,11 @@ export class FakeConfluence implements ConfluenceGateway {
 
   setPageMissing(pageId: string): this {
     this.missingPages.add(pageId);
+    return this;
+  }
+
+  setPageTitle(pageId: string, title: string): this {
+    this.pageTitles.set(pageId, title);
     return this;
   }
 
@@ -143,7 +149,7 @@ export class FakeConfluence implements ConfluenceGateway {
     if (this.missingPages.has(pageId) || !this.pages.has(pageId)) {
       return { status: 'MISSING', title: null };
     }
-    return { status: 'OK', title: `Page ${pageId}` };
+    return { status: 'OK', title: this.pageTitles.get(pageId) ?? `Page ${pageId}` };
   }
 
   async pageRestrictions(pageId: string): Promise<PageRestrictionHit[]> {

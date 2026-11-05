@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   GRANT_EXPIRY_PRESETS_DAYS,
   ROLES,
@@ -102,6 +102,227 @@ export function RoleLabel({ role }: { role: Role | null }) {
   return <>{role ? t(`role.${role}`) : t('role.none')}</>;
 }
 
+function expiresAtFor(preset: 'never' | '7' | '30' | '90'): string | null {
+  if (preset === 'never') return null;
+  const days = Number(preset);
+  return new Date(Date.now() + days * 86_400_000).toISOString();
+}
+
+function samePrincipal(a: PrincipalHit, b: PrincipalHit): boolean {
+  return a.principalType === b.principalType && a.principalId === b.principalId;
+}
+
+/** Search and multi-select live in a dialog so the permissions table stays a table. */
+function AddAccessDialog({
+  api,
+  onClose,
+  onAdd,
+}: {
+  api: Api;
+  onClose: () => void;
+  onAdd: (hits: PrincipalHit[], role: Role, expiresAt: string | null) => void;
+}) {
+  const t = useT();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const requestId = useRef(0);
+  const [kind, setKind] = useState<PrincipalType>('USER');
+  const [query, setQuery] = useState('');
+  const [hits, setHits] = useState<PrincipalHit[]>([]);
+  const [role, setRole] = useState<Role>('VIEW');
+  const [ttl, setTtl] = useState<'never' | '7' | '30' | '90'>('never');
+  const [picked, setPicked] = useState<PrincipalHit[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el || el.open) return;
+    try {
+      if (!el.open) el.showModal();
+    } catch {
+      el.setAttribute('open', '');
+    }
+    el.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+  }, []);
+
+  const runSearch = useCallback(
+    async (q: string, type: PrincipalType, id: number) => {
+      const trimmed = q.trim();
+      if (id !== requestId.current) return;
+      if (trimmed.length < 2) {
+        setHits([]);
+        setSearched(false);
+        setBusy(false);
+        setSearchError(null);
+        return;
+      }
+      setBusy(true);
+      setSearchError(null);
+      const res = await safeCall(api, 'searchPrincipals', { query: trimmed, type });
+      if (id !== requestId.current) return;
+      setBusy(false);
+      if (res.ok) {
+        setHits(res.data.hits);
+        setSearched(true);
+      } else setSearchError(errorText(new ApiError(res.code), t));
+    },
+    [api, t],
+  );
+
+  useEffect(() => {
+    const id = ++requestId.current;
+    const timer = window.setTimeout(() => void runSearch(query, kind, id), 300);
+    return () => window.clearTimeout(timer);
+  }, [query, kind, runSearch]);
+
+  useEffect(
+    () => () => {
+      requestId.current += 1;
+    },
+    [],
+  );
+
+  const toggle = (hit: PrincipalHit) => {
+    setPicked((cur) => {
+      const on = cur.some((p) => samePrincipal(p, hit));
+      if (role === 'ADMINISTER') return on ? [] : [hit];
+      return on ? cur.filter((p) => !samePrincipal(p, hit)) : [...cur, hit];
+    });
+  };
+
+  const searchLabel = kind === 'USER' ? t('perm.search.users') : t('perm.search.groups');
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="ss-modal"
+      aria-labelledby="ss-add-access-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <h2 id="ss-add-access-title">{t('perm.add')}</h2>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const id = ++requestId.current;
+          void runSearch(query, kind, id);
+        }}
+      >
+        <div className="ss-add-fields">
+          <label>
+            {t('perm.user')} / {t('perm.group')}
+            <select
+              value={kind}
+              onChange={(e) => {
+                setKind(e.target.value as PrincipalType);
+                setHits([]);
+                setPicked([]);
+                setSearched(false);
+                setSearchError(null);
+              }}
+            >
+              <option value="USER">{t('perm.user')}</option>
+              <option value="GROUP">{t('perm.group')}</option>
+            </select>
+          </label>
+          <label>
+            {searchLabel}
+            <input
+              type="search"
+              value={query}
+              minLength={2}
+              maxLength={100}
+              placeholder={searchLabel}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          <label>
+            {t('nav.permissions')}
+            <select
+              value={role}
+              onChange={(e) => {
+                const next = e.target.value as Role;
+                setRole(next);
+                if (next === 'ADMINISTER') setPicked((cur) => cur.slice(0, 1));
+              }}
+            >
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {t(`role.${r}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t('perm.expires')}
+            <select value={ttl} onChange={(e) => setTtl(e.target.value as typeof ttl)}>
+              <option value="never">{t('perm.expires.never')}</option>
+              {GRANT_EXPIRY_PRESETS_DAYS.map((d) => (
+                <option key={d} value={String(d)}>
+                  {t(`perm.expires.in${d}` as 'perm.expires.in7')}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button type="submit" className="ss-btn" disabled={query.trim().length < 2 || busy}>
+          {searchLabel}
+        </button>
+      </form>
+      {searchError && (
+        <p className="ss-err" role="alert">
+          {searchError}
+        </p>
+      )}
+      {busy && <p className="ss-muted">{t('perm.searching')}</p>}
+      {!busy && !searched && query.trim().length < 2 && (
+        <p className="ss-muted">{t('perm.search.hint')}</p>
+      )}
+      {!busy && searched && hits.length === 0 && (
+        <p className="ss-muted">{t('perm.search.empty')}</p>
+      )}
+      {hits.length > 0 && (
+        <ul className="ss-pick-list">
+          {hits.map((h) => {
+            const on = picked.some((p) => samePrincipal(p, h));
+            return (
+              <li key={`${h.principalType}:${h.principalId}`}>
+                <label className={`ss-pick${on ? ' is-on' : ''}`}>
+                  <input
+                    type="checkbox"
+                    aria-label={h.label}
+                    checked={on}
+                    onChange={() => toggle(h)}
+                  />
+                  <Avatar name={h.label} />
+                  <span>{h.label}</span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="ss-modal-actions">
+        <button type="button" className="ss-btn" onClick={onClose}>
+          {t('action.cancel')}
+        </button>
+        <button
+          type="button"
+          className="ss-btn ss-primary"
+          disabled={picked.length === 0}
+          onClick={() => onAdd(picked, role, expiresAtFor(ttl))}
+        >
+          {t('perm.multiAdd')}
+          {picked.length > 0 ? ` (${picked.length})` : ''}
+        </button>
+      </div>
+    </dialog>
+  );
+}
+
 // ------------------------------------------------------------------ Permissions
 
 export function PermissionsPanel({
@@ -114,16 +335,14 @@ export function PermissionsPanel({
   const t = useT();
   const grants = useLoad(async () => unwrap(await api.call('listGrants', {})));
   const access = useLoad(async () => unwrap(await api.call('getEffectiveAccess', {})));
-  const [kind, setKind] = useState<PrincipalType>('USER');
-  const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<PrincipalHit[]>([]);
-  const [role, setRole] = useState<Role>('VIEW');
-  const [ttl, setTtl] = useState<'never' | '7' | '30' | '90'>('never');
-  const [pendingAdmin, setPendingAdmin] = useState<PrincipalHit | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [pendingAdmin, setPendingAdmin] = useState<{
+    hit: PrincipalHit;
+    expiresAt?: string | null;
+  } | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<{ type: PrincipalType; id: string } | null>(
     null,
   );
-  const [picked, setPicked] = useState<PrincipalHit[]>([]);
   const [sourceRef, setSourceRef] = useState('');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [current, setCurrent] = useState<GrantList | null>(null);
@@ -134,9 +353,6 @@ export function PermissionsPanel({
       try {
         setCurrent(await run());
         setNotice({ kind: 'ok', text: t('perm.saved') });
-        setHits([]);
-        setPicked([]);
-        setQuery('');
         setSourceRef('');
       } catch (e) {
         const err = e instanceof ApiError ? e : new ApiError('UNAVAILABLE');
@@ -153,18 +369,6 @@ export function PermissionsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [t],
   );
-
-  const search = async () => {
-    const res = await safeCall(api, 'searchPrincipals', { query, type: kind });
-    if (res.ok) setHits(res.data.hits);
-    else setNotice({ kind: 'err', text: errorText(new ApiError(res.code), t) });
-  };
-
-  const expiresAtFor = (preset: 'never' | '7' | '30' | '90'): string | null => {
-    if (preset === 'never') return null;
-    const days = Number(preset);
-    return new Date(Date.now() + days * 86_400_000).toISOString();
-  };
 
   const upsert = (hit: PrincipalHit, r: Role, expiresAt?: string | null) =>
     apply(async () =>
@@ -243,7 +447,7 @@ export function PermissionsPanel({
                       principalId: g.principalId,
                       label: g.label,
                     };
-                    if (next === 'ADMINISTER') setPendingAdmin(hit);
+                    if (next === 'ADMINISTER') setPendingAdmin({ hit });
                     else void upsert(hit, next);
                   }}
                 >
@@ -338,12 +542,12 @@ export function PermissionsPanel({
       {pendingAdmin && (
         <div role="alertdialog" aria-label={t('perm.confirm.admin')} className="ss-callout ss-warn">
           <p>
-            <strong>{pendingAdmin.label}</strong>: {t('perm.confirm.admin')}
+            <strong>{pendingAdmin.hit.label}</strong>: {t('perm.confirm.admin')}
           </p>
           <button
             type="button"
             className="ss-btn ss-danger"
-            onClick={() => void upsert(pendingAdmin, 'ADMINISTER')}
+            onClick={() => void upsert(pendingAdmin.hit, 'ADMINISTER', pendingAdmin.expiresAt)}
           >
             {t('action.confirm')}
           </button>
@@ -352,116 +556,26 @@ export function PermissionsPanel({
           </button>
         </div>
       )}
-      <h3>{t('perm.add')}</h3>
-      <form
-        className="ss-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void search();
-        }}
-      >
-        <label>
-          <span className="ss-sr">{t('perm.add')}</span>
-          <select
-            value={kind}
-            onChange={(e) => setKind(e.target.value as PrincipalType)}
-            aria-label={t('perm.add')}
-          >
-            <option value="USER">{t('perm.user')}</option>
-            <option value="GROUP">{t('perm.group')}</option>
-          </select>
-        </label>
-        <label>
-          <span className="ss-sr">
-            {kind === 'USER' ? t('perm.search.users') : t('perm.search.groups')}
-          </span>
-          <input
-            type="search"
-            value={query}
-            minLength={2}
-            maxLength={100}
-            placeholder={kind === 'USER' ? t('perm.search.users') : t('perm.search.groups')}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        <label>
-          <span className="ss-sr">{t('nav.permissions')}</span>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            aria-label={t('nav.permissions')}
-          >
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {t(`role.${r}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="ss-sr">{t('perm.expires')}</span>
-          <select
-            value={ttl}
-            onChange={(e) => setTtl(e.target.value as typeof ttl)}
-            aria-label={t('perm.expires')}
-          >
-            <option value="never">{t('perm.expires.never')}</option>
-            {GRANT_EXPIRY_PRESETS_DAYS.map((d) => (
-              <option key={d} value={String(d)}>
-                {t(`perm.expires.in${d}` as 'perm.expires.in7')}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="ss-btn" disabled={query.trim().length < 2}>
-          {kind === 'USER' ? t('perm.search.users') : t('perm.search.groups')}
+      <p>
+        <button type="button" className="ss-btn ss-primary" onClick={() => setAddOpen(true)}>
+          {t('perm.add')}
         </button>
-      </form>
-      <ul className="ss-hits">
-        {hits.map((h) => {
-          const key = `${h.principalType}:${h.principalId}`;
-          const on = picked.some((p) => `${p.principalType}:${p.principalId}` === key);
-          return (
-            <li key={key}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={() =>
-                    setPicked((cur) =>
-                      on
-                        ? cur.filter((p) => `${p.principalType}:${p.principalId}` !== key)
-                        : [...cur, h],
-                    )
-                  }
-                />{' '}
-                {h.label}
-              </label>
-              <button
-                type="button"
-                className="ss-btn"
-                onClick={() =>
-                  role === 'ADMINISTER'
-                    ? setPendingAdmin(h)
-                    : void upsert(h, role, expiresAtFor(ttl))
-                }
-              >
-                {t('action.add')}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {picked.length > 0 && role !== 'ADMINISTER' && (
-        <button
-          type="button"
-          className="ss-btn ss-primary"
-          onClick={() =>
-            apply(async () => {
+      </p>
+      {addOpen && (
+        <AddAccessDialog
+          api={api}
+          onClose={() => setAddOpen(false)}
+          onAdd={(hits, role, expiresAt) => {
+            setAddOpen(false);
+            if (role === 'ADMINISTER') {
+              const hit = hits[0];
+              if (hit) setPendingAdmin({ hit, expiresAt });
+              return;
+            }
+            void apply(async () => {
               let version = list.aclVersion;
               let last = list;
-              const expiresAt = expiresAtFor(ttl);
-              for (const h of picked) {
+              for (const h of hits) {
                 last = unwrap(
                   await api.call('upsertGrant', {
                     principalType: h.principalType,
@@ -474,11 +588,9 @@ export function PermissionsPanel({
                 version = last.aclVersion;
               }
               return last;
-            })
-          }
-        >
-          {t('perm.multiAdd')} ({picked.length})
-        </button>
+            });
+          }}
+        />
       )}
       <h3>{t('perm.copy')}</h3>
       <form

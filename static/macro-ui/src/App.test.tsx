@@ -201,6 +201,123 @@ describe('App states', () => {
     );
   });
 
+  it('a quiet reader view is the lock card alone, and an administrator still sees the full chrome', async () => {
+    const quiet = {
+      showGrantNotice: false,
+      showReload: false,
+      showHelp: false,
+      showLastSaved: false,
+      showTitle: false,
+      showAccessCount: false,
+    };
+    const reader = scriptedApi({
+      getSection: () =>
+        readyView({
+          role: 'VIEW',
+          canWrite: false,
+          notice: { role: 'VIEW', addedByName: 'Israel Garcia', at: '2026-01-01T00:00:00.000Z' },
+          viewer: quiet,
+        }),
+    });
+    const { container } = renderWithI18n(<App api={reader} />);
+    expect(await screen.findByRole('heading', { name: /Unlock it to read/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeTruthy();
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reload' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
+    expect(screen.queryByText(/gave you access/)).toBeNull();
+    expect(screen.queryByText(/Saved by/)).toBeNull();
+    expect(screen.queryByText(/Access:/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Secure section' })).toBeNull();
+    await expectNoA11yViolations(container);
+
+    const admin = scriptedApi({ getSection: () => readyView({ viewer: quiet }) });
+    renderWithI18n(<App api={admin} />);
+    expect(await screen.findByRole('heading', { name: 'Secure section' })).toBeTruthy();
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Content',
+      'Permissions',
+      'History',
+      'Activity',
+      'Help',
+    ]);
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeTruthy();
+    expect(screen.getByText(/Saved by Alice/)).toBeTruthy();
+  });
+
+  it('hides Help and drops the tab bar for a reader, but keeps History for an editor', async () => {
+    const viewer = {
+      showGrantNotice: true,
+      showReload: true,
+      showHelp: false,
+      showLastSaved: true,
+      showTitle: true,
+      showAccessCount: false,
+    };
+    renderWithI18n(
+      <App
+        api={scriptedApi({
+          getSection: () => readyView({ role: 'VIEW', canWrite: false, viewer }),
+        })}
+      />,
+    );
+    await screen.findByRole('button', { name: 'Unlock' });
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByText(/Access:/)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Secure section' })).toBeTruthy();
+
+    renderWithI18n(
+      <App
+        api={scriptedApi({
+          getSection: () => readyView({ role: 'MODIFY', canWrite: true, viewer }),
+        })}
+      />,
+    );
+    expect((await screen.findAllByRole('tab')).map((t) => t.textContent)).toEqual([
+      'Content',
+      'History',
+    ]);
+  });
+
+  it('dismiss hides the grant note and does not show it again', async () => {
+    let reads = 0;
+    const api = scriptedApi({
+      getSection: () => {
+        reads += 1;
+        return readyView({
+          role: 'VIEW',
+          canWrite: false,
+          notice:
+            reads === 1
+              ? { role: 'VIEW', addedByName: 'Israel Garcia', at: '2026-01-01T00:00:00.000Z' }
+              : null,
+        });
+      },
+      dismissNotice: () => ({ ok: true, data: { dismissed: true } }),
+    });
+    renderWithI18n(<App api={api} />);
+    expect(await screen.findByText(/Israel Garcia gave you access/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText(/gave you access/)).toBeNull();
+    expect(api.calls.some((c) => c.fn === 'dismissNotice')).toBe(true);
+  });
+
+  it('keeps the grant note visible when dismissal does not persist', async () => {
+    const api = scriptedApi({
+      getSection: () =>
+        readyView({
+          role: 'VIEW',
+          canWrite: false,
+          notice: { role: 'VIEW', addedByName: 'Israel Garcia', at: '2026-01-01T00:00:00.000Z' },
+        }),
+      dismissNotice: () => ({ ok: false, code: 'UNAVAILABLE' }),
+    });
+    renderWithI18n(<App api={api} />);
+    expect(await screen.findByText(/Israel Garcia gave you access/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(await screen.findByText(/Israel Garcia gave you access/)).toBeTruthy();
+  });
+
   it('renders in Spanish', async () => {
     const api = scriptedApi({ getSection: () => ({ state: 'DENIED' }) });
     renderWithI18n(<App api={api} />, 'es');

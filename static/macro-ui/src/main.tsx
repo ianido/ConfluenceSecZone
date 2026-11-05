@@ -24,20 +24,24 @@ function surfaceOf(c: { moduleKey?: unknown; extension?: { type?: unknown } }): 
 function Root() {
   const [locale, setLocale] = useState<Locale>('en');
   const [surface, setSurface] = useState<Surface>('macro');
+  const [siteUrl, setSiteUrl] = useState<string | null>(null);
   useEffect(() => {
-    // Display-only: the locale and module pick which screen to render. Authorization stays server-side.
+    // Display-only: the locale, module and site URL pick which screen to render and where page
+    // links go. Authorization stays server-side.
     void view.theme.enable().catch(() => undefined);
     void view
       .getContext()
       .then((c) => {
-        setLocale(resolveLocale(typeof c.locale === 'string' ? c.locale : undefined));
+        const raw = c as { locale?: unknown; siteUrl?: unknown };
+        setLocale(resolveLocale(typeof raw.locale === 'string' ? raw.locale : undefined));
         setSurface(surfaceOf(c));
+        setSiteUrl(typeof raw.siteUrl === 'string' ? raw.siteUrl : null);
       })
       .catch(() => undefined);
   }, []);
   const screen =
     surface === 'home' ? (
-      <Home api={forgeApi} />
+      <Home api={forgeApi} siteUrl={siteUrl} />
     ) : surface === 'admin' ? (
       <Admin api={forgeApi} />
     ) : surface === 'byline' ? (

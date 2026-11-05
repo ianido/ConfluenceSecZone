@@ -250,6 +250,12 @@ export function Admin({ api }: { api: Api }) {
                   </select>
                 }
               />
+              <h3 className="ss-kicker">{t('admin.reader.kicker')}</h3>
+              <p className="ss-muted">{t('admin.reader.help')}</p>
+              <ReaderSettings
+                viewer={data.policy.viewer}
+                onChange={(viewer) => setPolicy({ viewer })}
+              />
               <h3 className="ss-kicker">{t('admin.retention.kicker')}</h3>
               <RetentionRow retention={data.retention} onChange={setRetention} onSave={save} />
               <h3 className="ss-kicker">{t('admin.classes')}</h3>
@@ -405,6 +411,85 @@ export function Admin({ api }: { api: Api }) {
   );
 }
 
+function ReaderSettings({
+  viewer,
+  onChange,
+}: {
+  viewer: SitePolicy['viewer'];
+  onChange: (viewer: SitePolicy['viewer']) => void;
+}) {
+  const t = useT();
+  const set = (patch: Partial<SitePolicy['viewer']>) => onChange({ ...viewer, ...patch });
+  return (
+    <>
+      <Setting
+        title={t('admin.reader.notice')}
+        help={t('admin.reader.notice.help')}
+        control={
+          <Switch
+            label={t('admin.reader.notice')}
+            checked={viewer.showGrantNotice}
+            onChange={(checked) => set({ showGrantNotice: checked })}
+          />
+        }
+      />
+      <Setting
+        title={t('admin.reader.reload')}
+        control={
+          <Switch
+            label={t('admin.reader.reload')}
+            checked={viewer.showReload}
+            onChange={(checked) => set({ showReload: checked })}
+          />
+        }
+      />
+      <Setting
+        title={t('admin.reader.helpTab')}
+        help={t('admin.reader.helpTab.help')}
+        control={
+          <Switch
+            label={t('admin.reader.helpTab')}
+            checked={viewer.showHelp}
+            onChange={(checked) => set({ showHelp: checked })}
+          />
+        }
+      />
+      <Setting
+        title={t('admin.reader.saved')}
+        control={
+          <Switch
+            label={t('admin.reader.saved')}
+            checked={viewer.showLastSaved}
+            onChange={(checked) => set({ showLastSaved: checked })}
+          />
+        }
+      />
+      <Setting
+        title={t('admin.reader.title')}
+        control={
+          <Switch
+            label={t('admin.reader.title')}
+            checked={viewer.showTitle}
+            onChange={(checked) => set({ showTitle: checked })}
+          />
+        }
+      />
+      <Setting
+        title={t('admin.reader.access')}
+        help={t('admin.reader.access.help')}
+        control={
+          <Switch
+            label={t('admin.reader.access')}
+            checked={viewer.showTitle && viewer.showAccessCount}
+            disabled={!viewer.showTitle}
+            onChange={(checked) => set({ showAccessCount: checked })}
+          />
+        }
+      />
+    </>
+  );
+}
+
 function Setting({ title, help, control }: { title: string; help?: string; control: ReactNode }) {
   return (
     <div className="ss-setting">
@@ -420,10 +505,12 @@ function Setting({ title, help, control }: { title: string; help?: string; contr
 function Switch({
   label,
   checked,
+  disabled = false,
   onChange,
 }: {
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
@@ -432,6 +519,7 @@ function Switch({
         type="checkbox"
         aria-label={label}
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
       />
       <span />

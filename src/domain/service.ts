@@ -34,6 +34,8 @@ import {
   type MySections,
   type PageSectionRow,
   type SitePolicy,
+  type ViewerChrome,
+  DEFAULT_VIEWER_CHROME,
   type UserSummary,
   type AuditAction,
   MAX_GRANT_TTL_DAYS,
@@ -320,6 +322,7 @@ export class SecureSectionService {
     content: ContentPayload,
     notice: GrantNotice | null,
     protection: ProtectionFlags,
+    viewer: ViewerChrome,
   ): SectionView {
     const role = r.role.role as Role;
     return {
@@ -332,6 +335,7 @@ export class SecureSectionService {
       meta: this.metaOf(r.section.value),
       notice,
       protection,
+      viewer,
     };
   }
 
@@ -372,6 +376,7 @@ export class SecureSectionService {
       lockByDefault: raw.lockByDefault !== false,
       whoMayCreate: raw.whoMayCreate === 'SITE_ADMINS' ? 'SITE_ADMINS' : 'PAGE_EDITORS',
       classes,
+      viewer: readViewerChrome(raw.viewer),
     };
   }
 
@@ -448,11 +453,13 @@ export class SecureSectionService {
     }
     try {
       const content = await this.readHead(r.section.value);
+      const policy = await this.readSitePolicy();
       return this.viewOf(
         r,
         content,
         await this.noticeFor(r.section.value, accountId),
         await this.protectionFor(r.section.value, accountId),
+        policy.viewer,
       );
     } catch (e) {
       if (e instanceof CorruptedContentError) {
@@ -1870,8 +1877,11 @@ export class SecureSectionService {
     for (const { section, role } of visible) {
       const s = section.value;
       let pageStatus: MySections['rows'][number]['pageStatus'] = 'UNKNOWN';
+      let pageTitle: string | null = null;
       try {
-        pageStatus = (await this.gateway.pageSummary(s.primaryPageId)).status;
+        const page = await this.gateway.pageSummary(s.primaryPageId);
+        pageStatus = page.status;
+        pageTitle = page.title;
       } catch (e) {
         if (!(e instanceof GatewayError)) throw e;
       }
@@ -1890,6 +1900,7 @@ export class SecureSectionService {
         title: s.title ?? null,
         classification: s.classification ?? null,
         pageId: s.primaryPageId,
+        pageTitle,
         spaceKey: s.spaceKey,
         pageStatus,
         role,
@@ -2233,6 +2244,38 @@ function parseSitePolicy(raw: unknown): SitePolicy {
     lockByDefault: o.lockByDefault,
     whoMayCreate: o.whoMayCreate,
     classes,
+    viewer: parseViewerChrome(o.viewer),
+  };
+}
+
+function readViewerChrome(raw: unknown): ViewerChrome {
+  const o = typeof raw === 'object' && raw !== null ? (raw as Partial<ViewerChrome>) : {};
+  const on = (key: keyof ViewerChrome) => o[key] !== false;
+  return {
+    showGrantNotice: on('showGrantNotice'),
+    showReload: on('showReload'),
+    showHelp: on('showHelp'),
+    showLastSaved: on('showLastSaved'),
+    showTitle: on('showTitle'),
+    showAccessCount: on('showAccessCount'),
+  };
+}
+
+function parseViewerChrome(raw: unknown): ViewerChrome {
+  if (raw === undefined) return { ...DEFAULT_VIEWER_CHROME };
+  if (typeof raw !== 'object' || raw === null) throw new DomainError('INVALID_REQUEST');
+  const o = raw as Record<string, unknown>;
+  const flag = (key: keyof ViewerChrome): boolean => {
+    if (typeof o[key] !== 'boolean') throw new DomainError('INVALID_REQUEST');
+    return o[key];
+  };
+  return {
+    showGrantNotice: flag('showGrantNotice'),
+    showReload: flag('showReload'),
+    showHelp: flag('showHelp'),
+    showLastSaved: flag('showLastSaved'),
+    showTitle: flag('showTitle'),
+    showAccessCount: flag('showAccessCount'),
   };
 }
 
