@@ -369,6 +369,11 @@ summary:focus-visible {
   overflow: visible;
   max-width: 32vw;
 }
+.ss-home-table .ss-page-label {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
 .ss-home-table .ss-clip {
   display: inline-block;
   max-width: 32vw;
@@ -381,6 +386,15 @@ summary:focus-visible {
   color: #0c66e4;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.ss-home-table button.ss-clip {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: default;
 }
 .ss-home-table a.ss-clip:hover {
   color: #0055cc;
@@ -403,8 +417,7 @@ summary:focus-visible {
   line-height: 1.4;
   box-shadow: 0 4px 12px rgba(9, 30, 66, 0.25);
 }
-.ss-home-table .ss-page-cell:hover .ss-tip,
-.ss-home-table .ss-page-cell:focus-within .ss-tip {
+.ss-home-table .ss-page-label.ss-tip-open .ss-tip {
   display: block;
 }
 .ss-chip {

@@ -65,8 +65,27 @@ describe('My secure sections page column', () => {
     renderWithI18n(<Home api={api} siteUrl="https://example.atlassian.net" />);
     const label = await screen.findByTitle('[2134310913]');
     expect(label.textContent).toBe('2134310913');
-    expect(label.tagName).toBe('SPAN');
+    expect(label.tagName).toBe('BUTTON');
+    expect(label.getAttribute('type')).toBe('button');
     expect(screen.queryByRole('link')).toBeNull();
+    await userEvent.click(label);
+    expect(label.parentElement?.className).toContain('ss-tip-open');
+    await userEvent.keyboard('{Escape}');
+    expect(label.parentElement?.className).not.toContain('ss-tip-open');
+    expect(document.activeElement).toBe(label);
+  });
+
+  it('hides the page tooltip on Escape until the pointer leaves and returns', async () => {
+    const api = scriptedApi({ listMySections: () => ({ ok: true, data }) });
+    renderWithI18n(<Home api={api} siteUrl="https://example.atlassian.net" />);
+    const label = await screen.findByRole('link', { name: longTitle });
+    await userEvent.hover(label);
+    expect(label.parentElement?.className).toContain('ss-tip-open');
+    await userEvent.keyboard('{Escape}');
+    expect(label.parentElement?.className).not.toContain('ss-tip-open');
+    await userEvent.unhover(label);
+    await userEvent.hover(label);
+    expect(label.parentElement?.className).toContain('ss-tip-open');
   });
 
   it('keeps the list on screen when opening the page fails', async () => {
