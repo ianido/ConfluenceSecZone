@@ -11,11 +11,11 @@
   "dependencies": {
     "@forge/bridge": "^7.2.1",
     "@secure-sections/shared": "*",
-    "@tiptap/core": "^3.32.2",
-    "@tiptap/extension-table": "^3.32.2",
+    "@tiptap/core": "^3.32.3",
+    "@tiptap/extension-table": "^3.32.3",
     "@tiptap/pm": "^3.32.2",
-    "@tiptap/react": "^3.32.2",
-    "@tiptap/starter-kit": "^3.32.2",
+    "@tiptap/react": "^3.32.3",
+    "@tiptap/starter-kit": "^3.32.3",
     "prosemirror-view": "^1.42.9",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
