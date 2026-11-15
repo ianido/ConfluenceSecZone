@@ -9,7 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@forge/bridge": "^7.2.1",
+    "@forge/bridge": "^7.3.0",
     "@secure-sections/shared": "*",
     "@tiptap/core": "^3.32.2",
     "@tiptap/extension-table": "^3.32.2",
